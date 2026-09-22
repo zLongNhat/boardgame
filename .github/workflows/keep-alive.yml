@@ -1,0 +1,35 @@
+# Keep-alive: ping Render free service before its 15-minute idle spin-down.
+#
+# NOTES:
+# - A free Render web service sleeps after 15 min without inbound traffic;
+#   this ping counts as real HTTP traffic, so the service stays awake.
+# - Keeping one service awake ~24/7 uses nearly the whole workspace allowance
+#   of 750 free instance hours/month. Do NOT add a second always-on free
+#   service in the same Render workspace or both get suspended until next month.
+# - GitHub disables scheduled workflows after 60 days without repo activity.
+name: Keep Render service alive
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          set -euo pipefail
+          url="${{ vars.RENDER_URL }}"
+          if [ -z "$url" ]; then
+            url="https://omnideck-arena.onrender.com/api/health"
+          fi
+          echo "Pinging $url"
+          code=$(curl -sS -o /tmp/health.json -w '%{http_code}' --max-time 60 "$url")
+          cat /tmp/health.json
+          echo
+          if [ "$code" != "200" ]; then
+            echo "::error::Health check returned HTTP $code"
+            exit 1
+          fi
