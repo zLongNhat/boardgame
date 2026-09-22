@@ -86,3 +86,40 @@ test('TienLenGame - Setup and state masking', () => {
   assert.strictEqual((masked.players[1] as any).myHand, undefined, 'Bob hand is strictly redacted');
   game.clearTurnTimer();
 });
+
+test('TienLenGame - Out-of-turn cut with Tứ Quý and 3 Đôi Thông on 2', () => {
+  const players = [
+    { id: 'p1', name: 'Alice', avatar: 'av-1', isBot: false },
+    { id: 'p2', name: 'Bob', avatar: 'av-2', isBot: false },
+    { id: 'p3', name: 'Charlie', avatar: 'av-3', isBot: false }
+  ];
+
+  const game = new TienLenGame(players, { firstTurnRule: false, cutTwoOutOfTurnRule: true });
+  game.start();
+
+  // Set Alice as current turn and give her a 2
+  (game as any).state.currentTurnIndex = 0;
+  const aliceHand = (game as any).hands.get('p1');
+  const twoOfDiamonds = makeCard('2', 15, 'diamonds', 2);
+  aliceHand[0] = twoOfDiamonds;
+
+  // Alice plays 2 of Diamonds
+  const playRes = game.handleAction('p1', { type: 'PLAY_CARDS', cardIds: [twoOfDiamonds.id] });
+  assert.strictEqual(playRes.success, true, 'Alice plays 2 of Diamonds');
+
+  // It is now Bob's turn (index 1), but Charlie (p3) has a Tứ Quý
+  const charlieHand = (game as any).hands.get('p3');
+  const fourKings = [
+    makeCard('K', 13, 'spades', 0),
+    makeCard('K', 13, 'clubs', 1),
+    makeCard('K', 13, 'diamonds', 2),
+    makeCard('K', 13, 'hearts', 3)
+  ];
+  charlieHand.splice(0, 4, ...fourKings);
+
+  // Charlie cuts out-of-turn!
+  const cutRes = game.handleAction('p3', { type: 'PLAY_CARDS', cardIds: fourKings.map(c => c.id) });
+  assert.strictEqual(cutRes.success, true, 'Charlie cuts 2 of Diamonds out-of-turn with Tứ Quý');
+  assert.strictEqual((game as any).state.currentTrick.combo.type, 'four_of_a_kind');
+  game.clearTurnTimer();
+});

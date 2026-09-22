@@ -59,6 +59,7 @@ export interface RoomSettings {
     drawToMatch: boolean;
   };
   tienLenFirstTurnRule: boolean;
+  tienLenCutTwoRule: boolean;
   ekExpansions: EKExpansions;
 }
 
@@ -282,6 +283,7 @@ export interface MaskedTLGameState {
   currentTrick: PlayedTrick | null;
   trickHistory: PlayedTrick[];
   firstTurnRule: boolean;
+  cutTwoOutOfTurnRule?: boolean;
   logs: GameLogEntry[];
 }
 

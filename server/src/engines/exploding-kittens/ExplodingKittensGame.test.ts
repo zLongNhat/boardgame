@@ -221,3 +221,41 @@ test('ExplodingKittensGame - Cattermelon (Mèo dưa hấu) pair combo works', ()
   game.clearTurnTimer();
 });
 
+test('ExplodingKittensGame - Draw from bottom consumes card and cannot be drawn infinitely', () => {
+  const players = [
+    { id: 'p1', name: 'Alice', avatar: 'av-1', isBot: false },
+    { id: 'p2', name: 'Bob', avatar: 'av-2', isBot: false }
+  ];
+
+  const game = new ExplodingKittensGame(players);
+  game.start();
+
+  const aliceHand: any[] = (game as any).hands.get('p1');
+  aliceHand.length = 0;
+
+  // Alice does NOT have draw_from_bottom card
+  const failedRes = game.handleAction('p1', { type: 'DRAW_FROM_BOTTOM' });
+  assert.strictEqual(failedRes.success, false, 'Should fail when player does not have draw_from_bottom card');
+
+  // Give Alice exactly 1 draw_from_bottom card
+  aliceHand.push({ id: 'dfb-1', type: 'draw_from_bottom' as const, name: 'Rút Đáy', description: '' });
+
+  // Add a safe card at the bottom of the draw deck
+  (game as any).drawPile.unshift({ id: 'bottom-card', type: 'skip' as const, name: 'Bỏ Qua', description: '' });
+  game.state.drawPileCount = (game as any).drawPile.length;
+
+  const initialDeckCount = game.state.drawPileCount;
+  const successRes = game.handleAction('p1', { type: 'DRAW_FROM_BOTTOM' });
+  assert.strictEqual(successRes.success, true, 'Should succeed when player has draw_from_bottom');
+
+  // Verify the draw_from_bottom card was consumed!
+  assert.strictEqual(aliceHand.some(c => c.id === 'dfb-1'), false, 'draw_from_bottom card must be removed from hand');
+  assert.ok(aliceHand.some(c => c.id === 'bottom-card'), 'Alice should have received bottom card');
+  assert.strictEqual(game.state.drawPileCount, initialDeckCount - 1, 'Deck count must decrease by 1');
+
+  // Trying to draw from bottom again should now fail because Alice no longer has the card!
+  const secondTry = game.handleAction('p1', { type: 'DRAW_FROM_BOTTOM' });
+  assert.strictEqual(secondTry.success, false, 'Cannot draw from bottom again without holding another draw_from_bottom card');
+  game.clearTurnTimer();
+});
+

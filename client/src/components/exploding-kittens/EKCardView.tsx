@@ -123,10 +123,10 @@ export const EKCardView: React.FC<EKCardViewProps> = ({
       case 'exploding_kitten':
         return {
           border: 'border-red-600',
-          badge: 'bg-red-600 text-white',
+          badge: 'bg-red-600 text-white animate-pulse',
           icon: '💣',
-          title: 'MÈO NỔ',
-          desc: 'Rút phải lá này nếu không có thẻ Gỡ Bom, bạn sẽ bị nổ tung và rời trận.'
+          title: 'MÈO NỔ (ÔM BOM)',
+          desc: 'Đang ôm bom an toàn nhờ Mèo Đi Dạo! Kẻ nào trộm lá này từ bạn sẽ bị nổ tung!'
         };
       case 'imploding_kitten':
         return {

@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Eye, Flame, ShieldAlert, Sparkles
 import { EKCard, MaskedEKGameState } from '../../types/game';
 import { sounds } from '../../utils/sound';
 import { calcFanTransform, isDroppedInZone } from '../../utils/cardFan';
+import { syncHandOrder, reorderHand, calcReorderIndex, sortEKCards } from '../../utils/handReorder';
 import { EKCardView } from './EKCardView';
 
 interface EKTableViewProps {
@@ -35,6 +36,8 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
   const [defuseInsertion, setDefuseInsertion] = useState<'top' | 'bottom' | 'random'>('top');
   const [isDraggingCard, setIsDraggingCard] = useState<boolean>(false);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+  const [orderedHand, setOrderedHand] = useState<EKCard[]>(gameState.myHand);
+  const handContainerRef = useRef<HTMLDivElement>(null);
   const [slidingPlayedCard, setSlidingPlayedCard] = useState<{
     card: EKCard;
     startX: number;
@@ -42,6 +45,10 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
   } | null>(null);
   const [displayedDiscardPile, setDisplayedDiscardPile] = useState<EKCard[]>(gameState.discardPile);
   const [reorderingCards, setReorderingCards] = useState<EKCard[]>([]);
+
+  useEffect(() => {
+    setOrderedHand(prev => syncHandOrder(prev, gameState.myHand));
+  }, [gameState.myHand]);
 
   const prevDiscardLenRef = useRef<number>(gameState.discardPile.length);
   const ekUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -79,10 +86,16 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
 
   const isMyTurn = gameState.players[gameState.currentTurnIndex]?.id === myPlayerId;
   const isDefusing = gameState.pendingDefusal?.playerId === myPlayerId;
+
+  useEffect(() => {
+    if (isDefusing) {
+      sounds.playExplosion();
+    }
+  }, [isDefusing]);
   const isTargetOfFavor = gameState.pendingFavor?.fromPlayerId === myPlayerId;
   const hasNope = gameState.myHand.some(c => c.type === 'nope');
   const myDefuse = gameState.myHand.find(c => c.type === 'defuse');
-  const totalCards = gameState.myHand.length;
+  const totalCards = orderedHand.length;
   const hasDrawFromBottomInHand = gameState.myHand.some(c => c.type === 'draw_from_bottom');
 
   // Count cards by cat type to identify available pairs
@@ -477,25 +490,16 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
         )}
       </div>
 
-      {/* 3-Second NOPE Reaction Global Overlay */}
-      {gameState.pendingAction && (
-        <div className="fixed inset-x-0 top-20 z-50 flex justify-center px-4 pointer-events-auto">
-          <div className="bg-slate-900/95 border-2 border-rose-500/60 rounded-3xl p-5 max-w-lg w-full shadow-2xl shadow-rose-950/80 backdrop-blur-md animate-pulse">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-extrabold text-rose-400 text-sm flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4" />
-                LÁ BÀI VỪA ĐÁNH: {gameState.pendingAction.card.name}
-              </span>
-              <span className="font-mono text-xs font-bold text-slate-300">
-                {gameState.pendingAction.nopeCount % 2 === 1 ? '🚫 ĐÃ BỊ CHẶN NOPE!' : '⚡ ĐANG KÍCH HOẠT'}
-              </span>
-            </div>
+      {/* 3-Second NOPE Notification in the Corner (Just like Uno Catch Notification) */}
+      {gameState.pendingAction && (() => {
+        const initiator = gameState.players.find(p => p.id === gameState.pendingAction?.initiatorId);
+        const cardName = gameState.pendingAction.card.name;
+        const isNoped = gameState.pendingAction.nopeCount % 2 === 1;
 
-            <p className="text-xs text-slate-300 mb-4">
-              Bất kỳ người chơi nào có thẻ Chặn Nope đều có thể hủy bỏ hành động này trước khi hết giờ!
-            </p>
-
-            <div className="flex items-center gap-3">
+        return (
+          <div className="absolute right-6 top-8 flex flex-col items-end gap-2 z-40 pointer-events-auto max-w-xs sm:max-w-sm">
+            {/* Quick Nope Button if player holds a Nope card */}
+            {hasNope && (
               <button
                 onClick={() => {
                   const nopeCard = gameState.myHand.find(c => c.type === 'nope');
@@ -504,16 +508,29 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                     onSendAction({ type: 'PLAY_NOPE', cardId: nopeCard.id });
                   }
                 }}
-                disabled={!hasNope}
-                className="flex-1 py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition-all uppercase tracking-wider cursor-pointer"
+                className="px-4 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-2xl border-2 border-rose-400 animate-bounce cursor-pointer transition-all active:scale-95"
+                title="Nhấn để đánh thẻ Nope chặn ngay lập tức!"
               >
-                <XCircle className="w-4 h-4" />
-                CHẶN NOPE NGAY! {hasNope ? '(Có thẻ)' : '(Không có thẻ)'}
+                <XCircle className="w-5 h-5 text-amber-300" />
+                <span>{isNoped ? '🚫 HỦY CHẶN (NOPE LẠI)!' : `🚫 CHẶN NOPE: ${cardName}!`}</span>
               </button>
+            )}
+
+            {/* Corner Status Badge */}
+            <div className="px-3.5 py-2 rounded-2xl bg-slate-900/95 border border-rose-500/50 text-xs shadow-2xl backdrop-blur-md flex items-center gap-2.5">
+              <ShieldAlert className="w-4 h-4 text-rose-400 flex-shrink-0" />
+              <div className="flex flex-col text-right">
+                <span className="text-[11px] font-bold text-slate-300">
+                  {initiator?.name || 'Đối thủ'} đánh: <strong className="text-white">{cardName}</strong>
+                </span>
+                <span className={`text-[10px] font-extrabold ${isNoped ? 'text-rose-400' : 'text-amber-400'}`}>
+                  {isNoped ? '🚫 Đã bị chặn Nope!' : '⚡ Đang kích hoạt (Chờ Nope)...'}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 10-Second Defusal Emergency Modal (Exploding or Imploding Face-Down) */}
       {isDefusing && (
@@ -595,7 +612,11 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <p className="text-sm font-bold text-rose-300">Đang đếm ngược để nổ tung...</p>
+                  <div className="space-y-2 py-2">
+                    <div className="text-4xl animate-bounce">💥</div>
+                    <p className="text-sm font-black text-rose-300">BẠN KHÔNG CÓ THẺ GỠ BOM!</p>
+                    <p className="text-xs text-rose-400/80 animate-pulse">Đang phát nổ và rời trận đấu trong 2 giây...</p>
+                  </div>
                 )}
               </>
             )}
@@ -809,9 +830,21 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
           </div>
         )}
 
-        <div className="mb-1 flex items-center gap-3 text-xs font-semibold text-slate-300 pointer-events-auto">
+        <div className="mb-1 flex items-center gap-2.5 text-xs font-semibold text-slate-300 pointer-events-auto">
           <span>Bài của bạn: <strong className="text-white">{totalCards} lá</strong></span>
-          <span className="text-slate-500 text-[11px] hidden sm:inline">• Kéo bài ra giữa hoặc bấm vào để đánh</span>
+          <span className="text-slate-500 text-[11px] hidden sm:inline">• Kéo bài ra giữa để đánh, kéo ngang để xếp bài</span>
+          
+          <button
+            onClick={() => {
+              sounds.playCardSnap();
+              setOrderedHand(prev => sortEKCards(prev));
+            }}
+            className="px-2.5 py-0.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-[11px] font-bold text-slate-300 hover:text-white flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
+            title="Tự động gom nhóm mèo cùng loại, gỡ bom và bài chức năng"
+          >
+            <span>🐾 Gom bài</span>
+          </button>
+
           {isMyTurn && (
             <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse font-bold">
               Lượt Của Bạn!
@@ -820,8 +853,8 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
         </div>
 
         <div className="w-full overflow-visible pb-1 pt-2 flex items-end justify-center min-h-[160px] px-4 pointer-events-auto">
-          <div className={`flex ${totalCards <= 3 ? '-space-x-4 sm:-space-x-5' : totalCards <= 6 ? '-space-x-7 sm:-space-x-8' : totalCards <= 10 ? '-space-x-10 sm:-space-x-11' : '-space-x-13 sm:-space-x-14'}`}>
-            {gameState.myHand.map((card, i) => {
+          <div ref={handContainerRef} className={`flex ${totalCards <= 3 ? '-space-x-4 sm:-space-x-5' : totalCards <= 6 ? '-space-x-7 sm:-space-x-8' : totalCards <= 10 ? '-space-x-10 sm:-space-x-11' : '-space-x-13 sm:-space-x-14'}`}>
+            {orderedHand.map((card, i) => {
               const isSelected = selectedCards.includes(card.id);
               const fan = calcFanTransform(i, totalCards);
               const isHovered = hoveredCardId === card.id && !isDraggingCard;
@@ -831,6 +864,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
               return (
                 <motion.div
                   key={card.id}
+                  layout="position"
                   onMouseEnter={() => setHoveredCardId(card.id)}
                   onMouseLeave={() => setHoveredCardId(null)}
                   initial={{ rotate: fan.rotate, y: fan.y + 30, opacity: 0, scale: 0.9 }}
@@ -845,7 +879,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                     stiffness: 380,
                     damping: 24
                   }}
-                  drag={(!gameState.pendingAction && isMyTurn) || (card.type === 'nope' && !!gameState.pendingAction)}
+                  drag={true}
                   dragSnapToOrigin={true}
                   dragElastic={0.15}
                   onDragStart={() => {
@@ -855,9 +889,27 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                   onDragEnd={(_, info) => {
                     setIsDraggingCard(false);
                     const canNope = card.type === 'nope' && !!gameState.pendingAction;
-                    if (!canNope && (!isMyTurn || !!gameState.pendingAction)) return;
+                    
                     if (isDroppedInZone(info.point, 'ek-drop-zone')) {
+                      // Only allow playing if it's my turn or valid Nope
+                      if (!canNope && (!isMyTurn || !!gameState.pendingAction)) return;
                       handleCardClick(card, i);
+                      return;
+                    }
+
+                    // Card was dropped inside hand area -> check horizontal reorder
+                    if (Math.abs(info.offset.x) >= 18) {
+                      const newIdx = calcReorderIndex(
+                        i,
+                        info.offset.x,
+                        totalCards,
+                        handContainerRef.current?.getBoundingClientRect(),
+                        info.point.x
+                      );
+                      if (newIdx !== i) {
+                        setOrderedHand(prev => reorderHand(prev, i, newIdx));
+                        sounds.playCardSnap();
+                      }
                     }
                   }}
                   whileDrag={{
@@ -885,6 +937,11 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                   {isSelected && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-purple-500 text-white font-black text-[8.5px] tracking-tight shadow-xl border-2 border-white whitespace-nowrap z-20 pointer-events-none">
                       ✓ ĐÃ CHỌN ĐÔI
+                    </div>
+                  )}
+                  {card.type === 'exploding_kitten' && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-red-600 text-white font-black text-[8px] tracking-tight shadow-xl border border-red-300 whitespace-nowrap z-20 pointer-events-none animate-bounce">
+                      💣 ÔM BOM AN TOÀN
                     </div>
                   )}
                 </motion.div>

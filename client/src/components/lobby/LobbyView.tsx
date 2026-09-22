@@ -658,25 +658,61 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
             {room.settings.gameType === 'tien-len' && (
               <div className="space-y-4 pt-4 border-t border-slate-800/80">
+                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-200 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <span>⚡</span>
+                    <span>Quy Tắc Chặt Bài &amp; Gợi Ý Thông Minh</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-300/80">
+                    Hỗ trợ tự động đề xuất các bộ bài có thể đè, nút xếp bài nhanh ở góc bàn đấu, và cơ chế chặt Heo kịch tính.
+                  </p>
+                </div>
+
                 <span className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Luật Chơi Tiến Lên
+                  Tùy Chọn Luật Chơi Tiến Lên
                 </span>
-                <label
-                  className={`flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
-                    room.settings.tienLenFirstTurnRule
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
-                      : 'bg-slate-950/40 border-slate-800 text-slate-400'
-                  } ${!isHost && 'pointer-events-none opacity-80'}`}
-                >
-                  <span>Lượt đầu tiên bắt buộc phải có 3 Bích (3♠)</span>
-                  <input
-                    type="checkbox"
-                    checked={room.settings.tienLenFirstTurnRule}
-                    disabled={!isHost}
-                    onChange={(e) => onUpdateSettings({ tienLenFirstTurnRule: e.target.checked })}
-                    className="rounded text-emerald-600 focus:ring-0 bg-slate-900 border-slate-700"
-                  />
-                </label>
+
+                <div className="space-y-2">
+                  <label
+                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                      room.settings.tienLenCutTwoRule !== false
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                        : 'bg-slate-950/40 border-slate-800 text-slate-400'
+                    } ${!isHost && 'pointer-events-none opacity-80'}`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-bold">Chặt Heo tự do (Tứ Quý &amp; 3 Đôi Thông)</span>
+                      <span className="text-[11px] text-slate-400">Cho phép Tứ Quý và 3 Đôi Thông chặt Heo ngay cả khi không đến lượt</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={room.settings.tienLenCutTwoRule !== false}
+                      disabled={!isHost}
+                      onChange={(e) => onUpdateSettings({ tienLenCutTwoRule: e.target.checked })}
+                      className="rounded text-emerald-600 focus:ring-0 bg-slate-900 border-slate-700"
+                    />
+                  </label>
+
+                  <label
+                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                      room.settings.tienLenFirstTurnRule
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+                        : 'bg-slate-950/40 border-slate-800 text-slate-400'
+                    } ${!isHost && 'pointer-events-none opacity-80'}`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-bold">Lượt đầu tiên bắt buộc phải có 3 Bích (3♠)</span>
+                      <span className="text-[11px] text-slate-400">Ván đầu tiên người giữ 3♠ được đi trước và phải đánh lá 3♠</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={room.settings.tienLenFirstTurnRule}
+                      disabled={!isHost}
+                      onChange={(e) => onUpdateSettings({ tienLenFirstTurnRule: e.target.checked })}
+                      className="rounded text-emerald-600 focus:ring-0 bg-slate-900 border-slate-700"
+                    />
+                  </label>
+                </div>
               </div>
             )}
 

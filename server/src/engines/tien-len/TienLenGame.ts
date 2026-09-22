@@ -42,7 +42,7 @@ export class TienLenGame extends BaseGame<TienLenGameState, TLAction, MaskedTLGa
 
   constructor(
     players: { id: string; name: string; avatar: string; isBot: boolean }[],
-    options: { turnTimeLimit?: number; firstTurnRule?: boolean } = {}
+    options: { turnTimeLimit?: number; firstTurnRule?: boolean; cutTwoOutOfTurnRule?: boolean } = {}
   ) {
     const tlPlayers: TLPlayer[] = players.map(p => ({
       ...p,
@@ -69,6 +69,7 @@ export class TienLenGame extends BaseGame<TienLenGameState, TLAction, MaskedTLGa
       trickHistory: [],
       roundPassCount: 0,
       firstTurnRule: options.firstTurnRule ?? true,
+      cutTwoOutOfTurnRule: options.cutTwoOutOfTurnRule ?? true,
       finishedRanking: []
     };
 
@@ -160,9 +161,9 @@ export class TienLenGame extends BaseGame<TienLenGameState, TLAction, MaskedTLGa
       return { success: false, message: 'You have already finished!' };
     }
 
-    // Check for 4 Đôi thông out-of-turn jump-in
+    // Check for out-of-turn cut (4 Đôi Thông, hoặc Tứ Quý / 3 Đôi Thông chặt Heo)
     if (action.type === 'PLAY_CARDS' && this.state.currentTurnIndex !== playerIndex) {
-      return this.handleFourPairJumpIn(playerId, action.cardIds);
+      return this.handleOutOfTurnCut(playerId, action.cardIds);
     }
 
     // Check turn
@@ -181,27 +182,34 @@ export class TienLenGame extends BaseGame<TienLenGameState, TLAction, MaskedTLGa
     return { success: false, message: 'Unknown action.' };
   }
 
-  private handleFourPairJumpIn(playerId: string, cardIds: string[]): { success: boolean; message?: string } {
+  private handleOutOfTurnCut(playerId: string, cardIds: string[]): { success: boolean; message?: string } {
+    if (!this.state.currentTrick) {
+      return { success: false, message: 'Không có bài trên bàn để chặt.' };
+    }
+
     const hand = this.hands.get(playerId)!;
     const playedCards = hand.filter(c => cardIds.includes(c.id));
     const combo = CardEvaluator.evaluateCombo(playedCards);
 
-    // Only 4 Đôi thông can cut out-of-turn
-    if (combo.type !== 'four_pair_sequence') {
-      return { success: false, message: 'Only 4 Đôi thông can cut out of turn!' };
-    }
+    const isFourPair = combo.type === 'four_pair_sequence';
+    const canCutTwoOutOfTurn = this.state.cutTwoOutOfTurnRule ?? true;
+    const isSpecialCutTwo = canCutTwoOutOfTurn && (
+      combo.type === 'three_pair_sequence' || combo.type === 'four_of_a_kind'
+    );
 
-    if (!this.state.currentTrick) {
-      return { success: false, message: 'No trick to cut out of turn.' };
+    if (!isFourPair && !isSpecialCutTwo) {
+      return { success: false, message: 'Chỉ có 4 Đôi Thông hoặc Tứ Quý / 3 Đôi Thông chặt Heo mới được đánh ngoài lượt!' };
     }
 
     const canCut = CardEvaluator.canBeat(combo, this.state.currentTrick.combo);
     if (!canCut) {
-      return { success: false, message: 'This 4 Đôi thông cannot beat the current trick.' };
+      return { success: false, message: 'Bộ bài này không chặt được bài trên bàn.' };
     }
 
     // Execute out-of-turn cut!
-    this.addLog(`🔥 OUT-OF-TURN CHẶT! ${this.state.players.find(p => p.id === playerId)?.name} slammed 4 ĐÔI THÔNG!`, 'special', playerId);
+    const playerName = this.state.players.find(p => p.id === playerId)?.name;
+    const comboName = this.formatComboName(combo);
+    this.addLog(`🔥 CHẶT NGOÀI LƯỢT! ${playerName} đã chặt bằng ${comboName}!`, 'special', playerId);
     return this.executePlay(playerId, playedCards, combo);
   }
 
@@ -472,6 +480,7 @@ export class TienLenGame extends BaseGame<TienLenGameState, TLAction, MaskedTLGa
       currentTrick: this.state.currentTrick,
       trickHistory: this.state.trickHistory.slice(-5), // Last 5 tricks
       firstTurnRule: this.state.firstTurnRule,
+      cutTwoOutOfTurnRule: this.state.cutTwoOutOfTurnRule,
       logs: this.state.logs
     };
   }

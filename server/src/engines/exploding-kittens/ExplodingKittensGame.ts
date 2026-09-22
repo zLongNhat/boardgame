@@ -581,6 +581,15 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
         break;
       }
 
+      case 'draw_from_bottom': {
+        this.addLog(`${player.name} rút 1 lá dưới đáy bộ bài!`, 'action', playerId);
+        if (this.drawPile.length > 0) {
+          const drawn = this.drawPile.shift()!;
+          this.processDrawnCard(playerId, drawn, 'dưới đáy');
+        }
+        break;
+      }
+
       case 'catomic_bomb': {
         // Extract all exploding kittens
         const kittens: EKCard[] = [];
@@ -861,7 +870,28 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
     if (this.drawPile.length === 0) {
       return { success: false, message: 'Chồng bài rút đã hết.' };
     }
-    // Bottom card is at index 0 of drawPile
+
+    const hand = this.hands.get(playerId);
+    if (!hand) return { success: false, message: 'Hand not found.' };
+
+    const cardIndex = hand.findIndex(c => c.type === 'draw_from_bottom');
+    if (cardIndex === -1) {
+      return { success: false, message: 'Bạn không có thẻ Rút Đáy trên tay.' };
+    }
+
+    // 1. Consume the draw_from_bottom card
+    const [card] = hand.splice(cardIndex, 1);
+    this.discardPile.push(card);
+    this.state.discardPile = [...this.discardPile];
+    this.state.lastPlayedBy = playerId;
+    this.state.lastPlayedCard = card;
+
+    const player = this.state.players.find(p => p.id === playerId)!;
+    player.cardCount = hand.length;
+
+    this.addLog(`${player.name} đã đánh thẻ [Rút Đáy] và rút 1 lá dưới đáy bộ bài!`, 'action', playerId);
+
+    // 2. Bottom card is at index 0 of drawPile
     const drawn = this.drawPile.shift()!;
     return this.processDrawnCard(playerId, drawn, 'dưới đáy');
   }
@@ -910,7 +940,11 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
         // Streaking Kitten saves the player! Bomb is held secretly in hand
         hand.push(drawn);
         player.cardCount = hand.length;
-        this.addLog(`${player.name} đã rút bài an toàn.`, 'info', playerId);
+        this.addLog(
+          `🩲 THẦN HỘ MỆNH: MÈO ĐI DẠO! ${player.name} đã bí mật ôm lá Mèo Nổ trên tay mà không bị nổ tung! (Kẻ nào cướp phải sẽ nổ tung!)`,
+          'special',
+          playerId
+        );
 
         this.finishTurnAfterSafeDraw(player);
         return { success: true };
@@ -984,9 +1018,10 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
       this.addLog(`💀 ${player.name} KHÔNG CÓ thẻ Gỡ Bom! Đang đếm ngược để nổ tung...`, 'warning', playerId);
     }
 
+    const waitTimeMs = (!hasDefuse && !isImplodingFirstDraw) ? 2000 : 10000;
     this.defusalTimer = setTimeout(() => {
       this.handleDefusalTimeout();
-    }, 10000);
+    }, waitTimeMs);
     if (this.defusalTimer && typeof this.defusalTimer.unref === 'function') {
       this.defusalTimer.unref();
     }

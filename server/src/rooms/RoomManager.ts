@@ -34,6 +34,7 @@ export interface RoomSettings {
   unoMode: UnoMode;
   unoRules: UnoRules;
   tienLenFirstTurnRule: boolean;
+  tienLenCutTwoRule: boolean;
   ekExpansions: {
     implodingKittens: boolean;
     streakingKittens: boolean;
@@ -101,6 +102,7 @@ export class RoomManager {
           drawToMatch: false
         },
         tienLenFirstTurnRule: true,
+        tienLenCutTwoRule: true,
         ekExpansions: {
           implodingKittens: false,
           streakingKittens: false,
@@ -387,7 +389,8 @@ export class RoomManager {
       case 'tien-len':
         game = new TienLenGame(enginePlayers, {
           turnTimeLimit: room.settings.turnTimeLimit,
-          firstTurnRule: room.settings.tienLenFirstTurnRule
+          firstTurnRule: room.settings.tienLenFirstTurnRule,
+          cutTwoOutOfTurnRule: room.settings.tienLenCutTwoRule
         });
         break;
     }

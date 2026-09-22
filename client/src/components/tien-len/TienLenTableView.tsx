@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUpDown, Play } from 'lucide-react';
+import { ArrowUpDown, Play, Sparkles } from 'lucide-react';
 import { MaskedTLGameState, Suit, TLCard } from '../../types/game';
 import { sounds } from '../../utils/sound';
 import { calcFanTransform, isDroppedInZone } from '../../utils/cardFan';
+import { syncHandOrder, reorderHand, calcReorderIndex, sortTLCards } from '../../utils/handReorder';
+import { getSuggestedCombos } from '../../utils/tienLenSuggestions';
 
 interface TienLenTableViewProps {
   gameState: MaskedTLGameState;
@@ -17,14 +19,25 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
   onSendAction
 }) => {
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<'rank' | 'suit'>('rank');
+  const [sortBy, setSortBy] = useState<'rank' | 'suit' | 'custom'>('rank');
   const [isDraggingCard, setIsDraggingCard] = useState<boolean>(false);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [slidingCards, setSlidingCards] = useState<TLCard[] | null>(null);
   const [displayedTrick, setDisplayedTrick] = useState<any>(gameState.currentTrick);
+  const [orderedHand, setOrderedHand] = useState<TLCard[]>(() => sortTLCards(gameState.myHand, 'rank'));
+  const handContainerRef = useRef<HTMLDivElement>(null);
 
   const prevTrickKeyRef = useRef<string>(gameState.currentTrick?.combo?.cards?.map((c: any) => c.id).join('-') || '');
   const tlUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setOrderedHand(prev => {
+      if (sortBy === 'custom') {
+        return syncHandOrder(prev, gameState.myHand);
+      }
+      return sortTLCards(gameState.myHand, sortBy);
+    });
+  }, [gameState.myHand, sortBy]);
 
   useEffect(() => {
     const trickKey = gameState.currentTrick?.combo?.cards?.map((c: any) => c.id).join('-') || '';
@@ -52,17 +65,42 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
   const myPlayer = gameState.players.find(p => p.id === myPlayerId);
   const hasPassed = myPlayer?.hasPassedCurrentRound ?? false;
 
-  // Hand cards sorting
-  const sortedHand = useMemo(() => {
-    return [...gameState.myHand].sort((a, b) => {
-      if (sortBy === 'rank') {
-        return a.overallRank - b.overallRank;
-      } else {
-        if (a.suitValue !== b.suitValue) return a.suitValue - b.suitValue;
-        return a.rankValue - b.rankValue;
-      }
-    });
-  }, [gameState.myHand, sortBy]);
+  // Check if current selection can perform a valid cut (even out of turn)
+  const canCutOutOfTurn = useMemo(() => {
+    if (!gameState.currentTrick || selectedCardIds.length === 0) return false;
+    const selected = gameState.myHand.filter(c => selectedCardIds.includes(c.id));
+    const sorted = [...selected].sort((a, b) => a.overallRank - b.overallRank);
+    const len = sorted.length;
+    const curr = gameState.currentTrick.combo;
+
+    // 4 Đôi thông
+    if (len === 8 && isConsecutivePairs(sorted, 4)) {
+      if (curr.type === 'single' && curr.cards[0].rankValue === 15) return true;
+      if (curr.type === 'pair' && curr.cards[0].rankValue === 15) return true;
+      if (curr.type === 'three_pair_sequence') return true;
+      if (curr.type === 'four_of_a_kind') return true;
+      if (curr.type === 'four_pair_sequence') return sorted[7].overallRank > curr.highestCard.overallRank;
+    }
+
+    const allowCutTwo = gameState.cutTwoOutOfTurnRule !== false;
+    if (!allowCutTwo) return false;
+
+    // Tứ quý
+    if (len === 4 && sorted[0].rankValue === sorted[1].rankValue && sorted[1].rankValue === sorted[2].rankValue && sorted[2].rankValue === sorted[3].rankValue) {
+      if (curr.type === 'single' && curr.cards[0].rankValue === 15) return true;
+      if (curr.type === 'pair' && curr.cards[0].rankValue === 15) return true;
+      if (curr.type === 'three_pair_sequence') return true;
+      if (curr.type === 'four_of_a_kind') return sorted[3].overallRank > curr.highestCard.overallRank;
+    }
+
+    // 3 Đôi thông
+    if (len === 6 && isConsecutivePairs(sorted, 3)) {
+      if (curr.type === 'single' && curr.cards[0].rankValue === 15) return true;
+      if (curr.type === 'three_pair_sequence') return sorted[5].overallRank > curr.highestCard.overallRank;
+    }
+
+    return false;
+  }, [gameState.currentTrick, selectedCardIds, gameState.myHand, gameState.cutTwoOutOfTurnRule]);
 
   // Selected cards combination detector for live UI badge
   const comboPreview = useMemo(() => {
@@ -71,13 +109,22 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
 
     const sorted = [...selected].sort((a, b) => a.overallRank - b.overallRank);
     const len = sorted.length;
+    const curr = gameState.currentTrick?.combo;
 
     if (len === 1) return `Rác [${sorted[0].value}${getSuitIcon(sorted[0].suit)}]`;
     if (len === 2 && sorted[0].rankValue === sorted[1].rankValue) return `Đôi [${sorted[0].value}]`;
     if (len === 3 && sorted[0].rankValue === sorted[1].rankValue && sorted[1].rankValue === sorted[2].rankValue) {
       return `Sám cô [${sorted[0].value}]`;
     }
+
+    // Tứ Quý
     if (len === 4 && sorted[0].rankValue === sorted[1].rankValue && sorted[1].rankValue === sorted[2].rankValue && sorted[2].rankValue === sorted[3].rankValue) {
+      if (curr) {
+        if (curr.type === 'single' && curr.cards[0].rankValue === 15) return `💥 TỨ QUÝ CHẶT HEO!`;
+        if (curr.type === 'pair' && curr.cards[0].rankValue === 15) return `💥 TỨ QUÝ CHẶT ĐÔI HEO!`;
+        if (curr.type === 'three_pair_sequence') return `💥 TỨ QUÝ CHẶT 3 ĐÔI THÔNG!`;
+        if (curr.type === 'four_of_a_kind' && sorted[3].overallRank > curr.highestCard.overallRank) return `💥 TỨ QUÝ ĐÈ TỨ QUÝ!`;
+      }
       return `🔥 TỨ QUÝ [${sorted[0].value}]`;
     }
 
@@ -101,16 +148,45 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
 
     // 3 Đôi thông
     if (len === 6 && isConsecutivePairs(sorted, 3)) {
+      if (curr && curr.type === 'single' && curr.cards[0].rankValue === 15) {
+        return `💥 3 ĐÔI THÔNG CHẶT HEO!`;
+      }
       return `⚡ 3 ĐÔI THÔNG (đến ${sorted[len - 1].value})`;
     }
 
     // 4 Đôi thông
     if (len === 8 && isConsecutivePairs(sorted, 4)) {
+      if (curr && ((curr.type === 'single' || curr.type === 'pair') && curr.cards[0].rankValue === 15)) {
+        return `👑 4 ĐÔI THÔNG CHẶT HEO!`;
+      }
       return `👑 4 ĐÔI THÔNG (CHẶT KHÔNG CẦN VÒNG!)`;
     }
 
     return 'Tổ hợp chưa hợp lệ';
-  }, [selectedCardIds, gameState.myHand]);
+  }, [selectedCardIds, gameState.myHand, gameState.currentTrick]);
+
+  const isFirstTurnWithThreeSpades = useMemo(() => {
+    return Boolean(
+      gameState.firstTurnRule &&
+      gameState.trickHistory.length === 0 &&
+      gameState.currentTrick === null
+    );
+  }, [gameState.firstTurnRule, gameState.trickHistory.length, gameState.currentTrick]);
+
+  // Suggested playable combinations from player hand
+  const suggestedCombos = useMemo(() => {
+    const isSpecialCuttingOpportunity = gameState.currentTrick && (
+      (gameState.currentTrick.combo.type === 'single' && gameState.currentTrick.combo.cards[0].rankValue === 15) ||
+      (gameState.currentTrick.combo.type === 'pair' && gameState.currentTrick.combo.cards[0].rankValue === 15) ||
+      gameState.currentTrick.combo.type === 'three_pair_sequence' ||
+      gameState.currentTrick.combo.type === 'four_of_a_kind'
+    );
+
+    if (!isMyTurn && !isSpecialCuttingOpportunity) return [];
+    if (hasPassed && !isSpecialCuttingOpportunity) return [];
+
+    return getSuggestedCombos(gameState.myHand, gameState.currentTrick, isFirstTurnWithThreeSpades);
+  }, [gameState.myHand, gameState.currentTrick, isMyTurn, hasPassed, isFirstTurnWithThreeSpades]);
 
   const toggleSelectCard = (id: string) => {
     sounds.playCardSnap();
@@ -162,10 +238,61 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
     return suit === 'hearts' || suit === 'diamonds' ? 'text-rose-600' : 'text-slate-900';
   }
 
-  const totalCards = sortedHand.length;
+  const totalCards = orderedHand.length;
 
   return (
     <div className="absolute inset-0 select-none pointer-events-none">
+      {/* Quick Hand Sorting Corner Widget (Góc Màn Hình) */}
+      <div className="absolute right-6 top-8 flex flex-col items-end gap-1.5 z-30 pointer-events-auto">
+        <div className="flex items-center gap-1 p-1 bg-slate-900/90 border border-slate-700/80 rounded-2xl shadow-xl backdrop-blur-md">
+          <span className="text-[10px] font-black uppercase text-slate-400 px-2 hidden sm:inline">
+            Xếp bài:
+          </span>
+          <button
+            onClick={() => {
+              sounds.playCardSnap();
+              setSortBy('rank');
+            }}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              sortBy === 'rank'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Xếp bài từ 3 đến Heo (2)"
+          >
+            3 ➔ 2 (Điểm)
+          </button>
+          <button
+            onClick={() => {
+              sounds.playCardSnap();
+              setSortBy('suit');
+            }}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              sortBy === 'suit'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Xếp bài theo chất Bích ➔ Tép ➔ Rô ➔ Cơ"
+          >
+            ♠ ➔ ♥ (Chất)
+          </button>
+          <button
+            onClick={() => {
+              sounds.playCardSnap();
+              setSortBy('custom');
+            }}
+            className={`px-2.5 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+              sortBy === 'custom'
+                ? 'bg-amber-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+            title="Tự do kéo thả sắp xếp bằng chuột"
+          >
+            Tự Do ⇄
+          </button>
+        </div>
+      </div>
+
       {/* Center Table Trick Display / Drop Zone: DEAD IN THE EXACT MIDDLE OF THE TABLE */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
         <div
@@ -290,19 +417,70 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
 
       {/* PLAYER HAND & CONTROL BAR: ANCHORED AT THE BOTTOM OF THE TABLE */}
       <div className="absolute bottom-1 sm:bottom-2 left-0 right-0 flex flex-col items-center z-30 pointer-events-none">
+        {/* Playable Combo Suggestions Bar */}
+        {suggestedCombos.length > 0 && (
+          <div className="w-full max-w-2xl px-4 mb-1.5 flex items-center gap-1.5 overflow-x-auto pointer-events-auto py-1">
+            <span className="text-[11px] font-black text-amber-300 flex items-center gap-1 flex-shrink-0 bg-slate-900/90 px-2.5 py-1 rounded-xl border border-amber-500/40 shadow">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              Gợi ý đè bài:
+            </span>
+            {suggestedCombos.slice(0, 5).map((combo, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setSelectedCardIds(combo.cards.map(c => c.id));
+                  sounds.playCardSnap();
+                }}
+                className={`px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap shadow-md active:scale-95 ${
+                  combo.isSpecialCut
+                    ? 'bg-gradient-to-r from-rose-600 to-amber-600 text-white border border-rose-400 animate-pulse shadow-rose-600/30'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-indigo-200 hover:text-white border border-indigo-500/40'
+                }`}
+                title="Bấm để chọn nhanh các quân bài này trên tay"
+              >
+                <span>{combo.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isMyTurn && gameState.currentTrick && !hasPassed && suggestedCombos.length === 0 && (
+          <div className="mb-1 pointer-events-auto">
+            <span className="px-3 py-1 rounded-xl bg-slate-900/80 border border-slate-700 text-slate-400 text-xs font-medium">
+              💡 Không có bài đè được trên bàn (Hãy bấm <strong className="text-amber-300">Bỏ Lượt</strong>)
+            </span>
+          </div>
+        )}
+
         {/* Actions and Sorting Toolbar */}
         <div className="w-full max-w-2xl px-4 mb-1 flex items-center justify-between gap-3 pointer-events-auto">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setSortBy(sortBy === 'rank' ? 'suit' : 'rank')}
-              className="px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-xs font-bold flex items-center gap-1.5 text-slate-300 transition-colors"
+              onClick={() => {
+                sounds.playCardSnap();
+                if (sortBy === 'custom' || sortBy === 'suit') {
+                  setSortBy('rank');
+                } else {
+                  setSortBy('suit');
+                }
+              }}
+              className="px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-xs font-bold flex items-center gap-1.5 text-slate-300 transition-colors cursor-pointer active:scale-95"
+              title={sortBy === 'custom' ? 'Đang ở chế độ xếp tự do bằng chuột. Bấm để xếp tự động' : 'Bấm để đổi kiểu xếp bài'}
             >
               <ArrowUpDown className="w-3.5 h-3.5 text-indigo-400" />
-              Xếp bài: {sortBy === 'rank' ? 'Theo điểm (3➔2)' : 'Theo chất (♠➔♥)'}
+              {sortBy === 'custom'
+                ? 'Xếp bài: Tự do (Kéo thả ⇄)'
+                : sortBy === 'rank'
+                ? 'Xếp bài: Theo điểm (3➔2)'
+                : 'Xếp bài: Theo chất (♠➔♥)'}
             </button>
 
             {comboPreview && (
-              <span className="px-3 py-1.5 rounded-xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold">
+              <span className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                comboPreview.includes('CHẶT')
+                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 animate-pulse'
+                  : 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300'
+              }`}>
                 {comboPreview}
               </span>
             )}
@@ -313,7 +491,7 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
             <button
               onClick={handlePassTurn}
               disabled={!isMyTurn || !gameState.currentTrick || hasPassed}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300 disabled:opacity-40 transition-colors"
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300 disabled:opacity-40 transition-colors cursor-pointer"
             >
               Bỏ Lượt
             </button>
@@ -321,19 +499,23 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
             {/* Play button */}
             <button
               onClick={() => handlePlayCards()}
-              disabled={(!isMyTurn && comboPreview !== '👑 4 ĐÔI THÔNG (CHẶT KHÔNG CẦN VÒNG!)') || selectedCardIds.length === 0 || hasPassed}
-              className="px-6 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 disabled:opacity-40 transition-all active:scale-95"
+              disabled={(!isMyTurn && !canCutOutOfTurn) || selectedCardIds.length === 0 || hasPassed}
+              className={`px-6 py-2 rounded-xl text-white font-extrabold text-xs flex items-center gap-1.5 shadow-lg disabled:opacity-40 transition-all active:scale-95 cursor-pointer ${
+                canCutOutOfTurn && !isMyTurn
+                  ? 'bg-gradient-to-r from-rose-600 to-amber-600 shadow-rose-600/40 animate-pulse border border-rose-300'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-600/30'
+              }`}
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              Đánh bài ({selectedCardIds.length})
+              {canCutOutOfTurn && !isMyTurn ? '🔥 Chặt Ngay!' : `Đánh bài (${selectedCardIds.length})`}
             </button>
           </div>
         </div>
 
         {/* Hand Cards with Arc Fan and Drag-to-Play */}
         <div className="w-full overflow-visible pb-1 pt-2 flex items-end justify-center min-h-[160px] px-4 pointer-events-auto">
-          <div className={`flex ${totalCards <= 4 ? '-space-x-5 sm:-space-x-6' : totalCards <= 8 ? '-space-x-9 sm:-space-x-10' : totalCards <= 13 ? '-space-x-12 sm:-space-x-13' : '-space-x-14 sm:-space-x-15'}`}>
-            {sortedHand.map((card, i) => {
+          <div ref={handContainerRef} className={`flex ${totalCards <= 4 ? '-space-x-5 sm:-space-x-6' : totalCards <= 8 ? '-space-x-9 sm:-space-x-10' : totalCards <= 13 ? '-space-x-12 sm:-space-x-13' : '-space-x-14 sm:-space-x-15'}`}>
+            {orderedHand.map((card, i) => {
               const isSelected = selectedCardIds.includes(card.id);
               const fan = calcFanTransform(i, totalCards);
               const isHovered = hoveredCardId === card.id && !isDraggingCard;
@@ -341,6 +523,7 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
               return (
                 <motion.div
                   key={card.id}
+                  layout="position"
                   onMouseEnter={() => setHoveredCardId(card.id)}
                   onMouseLeave={() => setHoveredCardId(null)}
                   initial={{ rotate: fan.rotate, y: fan.y, opacity: 0, scale: 0.9 }}
@@ -351,7 +534,7 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
                     scale: isSelected ? 1.08 : (isHovered ? 1.15 : 1)
                   }}
                   transition={{ type: 'spring', stiffness: 380, damping: 24 }}
-                  drag={isMyTurn}
+                  drag={true}
                   dragSnapToOrigin={true}
                   dragElastic={0.15}
                   onDragStart={() => {
@@ -360,11 +543,28 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
                   }}
                   onDragEnd={(_, info) => {
                     setIsDraggingCard(false);
-                    if (!isMyTurn) return;
                     if (isDroppedInZone(info.point, 'tienlen-drop-zone')) {
+                      if (!isMyTurn && !canCutOutOfTurn) return;
                       // If this card is part of selection, play selection; otherwise play single card
                       const cards = selectedCardIds.includes(card.id) ? selectedCardIds : [card.id];
                       handlePlayCards(cards);
+                      return;
+                    }
+
+                    // Card was dropped inside the hand area -> check horizontal reorder
+                    if (Math.abs(info.offset.x) >= 18) {
+                      const newIdx = calcReorderIndex(
+                        i,
+                        info.offset.x,
+                        totalCards,
+                        handContainerRef.current?.getBoundingClientRect(),
+                        info.point.x
+                      );
+                      if (newIdx !== i) {
+                        setSortBy('custom');
+                        setOrderedHand(prev => reorderHand(prev, i, newIdx));
+                        sounds.playCardSnap();
+                      }
                     }
                   }}
                   whileDrag={{

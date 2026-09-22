@@ -59,6 +59,7 @@ export interface TienLenGameState extends BaseGameState {
   trickHistory: PlayedTrick[];
   roundPassCount: number;
   firstTurnRule: boolean; // First turn must contain 3 of Spades (if first game)
+  cutTwoOutOfTurnRule?: boolean; // Tứ quý và 3 Đôi thông chặt Heo không cần vòng
   finishedRanking: string[];
 }
 
@@ -87,6 +88,7 @@ export interface MaskedTLGameState {
   currentTrick: PlayedTrick | null;
   trickHistory: PlayedTrick[];
   firstTurnRule: boolean;
+  cutTwoOutOfTurnRule?: boolean;
   toiTrangWinner?: { playerId: string; type: ToiTrangType };
   logs: BaseGameState['logs'];
 }

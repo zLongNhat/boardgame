@@ -4,6 +4,7 @@ import { AlertCircle, Flame, Zap } from 'lucide-react';
 import { MaskedUnoGameState, UnoCard, UnoColor } from '../../types/game';
 import { sounds } from '../../utils/sound';
 import { calcFanTransform, isDroppedInZone } from '../../utils/cardFan';
+import { syncHandOrder, reorderHand, calcReorderIndex, sortUnoCards } from '../../utils/handReorder';
 import { UnoCardView } from './UnoCardView';
 
 interface UnoTableViewProps {
@@ -22,6 +23,8 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
   const [isFlexPlay, setIsFlexPlay] = useState<boolean>(false);
   const [isDraggingCard, setIsDraggingCard] = useState<boolean>(false);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+  const [orderedHand, setOrderedHand] = useState<UnoCard[]>(gameState.myHand);
+  const handContainerRef = useRef<HTMLDivElement>(null);
   const [slidingPlayedCard, setSlidingPlayedCard] = useState<{
     card: UnoCard;
     startX: number;
@@ -34,6 +37,10 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
 
   const prevTopIdRef = useRef<string>(gameState.topCard?.id);
   const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    setOrderedHand(prev => syncHandOrder(prev, gameState.myHand));
+  }, [gameState.myHand]);
 
   useEffect(() => {
     const currentTop = gameState.topCard;
@@ -69,7 +76,7 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
 
   const isMyTurn = gameState.players[gameState.currentTurnIndex]?.id === myPlayerId;
   const myPlayer = gameState.players.find(p => p.id === myPlayerId);
-  const totalCards = gameState.myHand.length;
+  const totalCards = orderedHand.length;
 
   const triggerPlayAnimation = (card: UnoCard, index: number, chosenColor?: UnoColor) => {
     const startX = (index - (totalCards - 1) / 2) * 28;
@@ -369,10 +376,22 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
 
       {/* PLAYER'S HAND CARDS: ANCHORED AT THE BOTTOM OF THE TABLE */}
       <div className="absolute bottom-1 sm:bottom-2 left-0 right-0 flex flex-col items-center z-30 pointer-events-none">
-        {/* Hand Status Bar */}
-        <div className="mb-1 flex items-center gap-3 text-xs font-semibold text-slate-300 pointer-events-auto">
+        {/* Hand Status Bar & Sorting */}
+        <div className="mb-1 flex items-center gap-2.5 text-xs font-semibold text-slate-300 pointer-events-auto">
           <span>Bài của bạn: <strong className="text-white">{totalCards} lá</strong></span>
-          <span className="text-slate-500 text-[11px] hidden sm:inline">• Kéo bài ra giữa hoặc bấm vào để đánh</span>
+          <span className="text-slate-500 text-[11px] hidden sm:inline">• Kéo bài ra giữa để đánh, kéo ngang để xếp bài</span>
+          
+          <button
+            onClick={() => {
+              sounds.playCardSnap();
+              setOrderedHand(prev => sortUnoCards(prev));
+            }}
+            className="px-2.5 py-0.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-[11px] font-bold text-slate-300 hover:text-white flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
+            title="Tự động gom nhóm bài theo màu và số"
+          >
+            <span>🎨 Gom màu</span>
+          </button>
+
           {isMyTurn && (
             <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse font-bold">
               Lượt Của Bạn!
@@ -380,16 +399,17 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
           )}
         </div>
 
-        {/* Hand Fanned Arc Container (Stable spacing without horizontal collapse) */}
+        {/* Hand Fanned Arc Container */}
         <div className="w-full overflow-visible pb-1 pt-2 flex items-end justify-center min-h-[160px] px-4 pointer-events-auto">
-          <div className={`flex ${getHandSpacing(totalCards)}`}>
-            {gameState.myHand.map((card, i) => {
+          <div ref={handContainerRef} className={`flex ${getHandSpacing(totalCards)}`}>
+            {orderedHand.map((card, i) => {
               const fan = calcFanTransform(i, totalCards);
               const isHovered = hoveredCardId === card.id && !isDraggingCard;
 
               return (
                 <motion.div
                   key={card.id}
+                  layout="position"
                   onMouseEnter={() => setHoveredCardId(card.id)}
                   onMouseLeave={() => setHoveredCardId(null)}
                   initial={{ rotate: fan.rotate, y: fan.y + 30, opacity: 0, scale: 0.9 }}
@@ -404,7 +424,7 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
                     stiffness: 380,
                     damping: 24
                   }}
-                  drag={isMyTurn || (gameState.rules.jumpIn && (card.color === gameState.topCard.color && card.value === gameState.topCard.value))}
+                  drag={true}
                   dragSnapToOrigin={true}
                   dragElastic={0.15}
                   onDragStart={() => {
@@ -413,11 +433,28 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
                   }}
                   onDragEnd={(_, info) => {
                     setIsDraggingCard(false);
-                    // Guard: only allow action if it's my turn or valid jump-in
                     const canJumpIn = gameState.rules.jumpIn && card.color === gameState.topCard.color && card.value === gameState.topCard.value;
-                    if (!isMyTurn && !canJumpIn) return;
+                    
                     if (isDroppedInZone(info.point, 'uno-drop-zone')) {
+                      // Guard: only allow play action if it's my turn or valid jump-in
+                      if (!isMyTurn && !canJumpIn) return;
                       handleCardClick(card, i);
+                      return;
+                    }
+
+                    // Card was dropped inside the hand area -> check horizontal reorder
+                    if (Math.abs(info.offset.x) >= 18) {
+                      const newIdx = calcReorderIndex(
+                        i,
+                        info.offset.x,
+                        totalCards,
+                        handContainerRef.current?.getBoundingClientRect(),
+                        info.point.x
+                      );
+                      if (newIdx !== i) {
+                        setOrderedHand(prev => reorderHand(prev, i, newIdx));
+                        sounds.playCardSnap();
+                      }
                     }
                   }}
                   whileDrag={{
