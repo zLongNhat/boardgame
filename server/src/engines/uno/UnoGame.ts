@@ -219,6 +219,7 @@ export class UnoGame extends BaseGame<UnoGameState, UnoAction, MaskedUnoGameStat
         'wild_draw_four': 4,
         'wild_reverse_draw_four': 4,
         'wild_draw_six': 6,
+        'wild_draw_eight': 8,
         'wild_draw_ten': 10
       };
       const cardDrawVal = drawValues[effectiveValue] || 0;
@@ -349,6 +350,16 @@ export class UnoGame extends BaseGame<UnoGameState, UnoAction, MaskedUnoGameStat
         this.state.pendingDrawCount += 6;
         this.state.pendingDrawType = 'wild_draw_six';
         this.addLog(`+6 Draw stacked! Total penalty: +${this.state.pendingDrawCount}`, 'special');
+        if (!this.state.rules.freeStacking) {
+          this.resolvePendingDrawOnNext();
+          return;
+        }
+        break;
+
+      case 'wild_draw_eight':
+        this.state.pendingDrawCount += 8;
+        this.state.pendingDrawType = 'wild_draw_eight';
+        this.addLog(`BRUTAL +8 Draw stacked! Total penalty: +${this.state.pendingDrawCount}`, 'special');
         if (!this.state.rules.freeStacking) {
           this.resolvePendingDrawOnNext();
           return;

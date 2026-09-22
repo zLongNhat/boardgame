@@ -12,6 +12,7 @@ export type UnoValue =
   // No Mercy extensions
   | 'draw_four'
   | 'wild_draw_six'
+  | 'wild_draw_eight'
   | 'wild_draw_ten'
   | 'skip_everyone'
   | 'discard_all'

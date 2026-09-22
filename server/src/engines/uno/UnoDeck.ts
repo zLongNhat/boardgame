@@ -156,7 +156,17 @@ export class UnoDeck {
       }
     }
 
-    // 8 Wild Reverse Draw 4
+    // 8 Wild Draw 4 (+4 đen)
+    for (let i = 0; i < 8; i++) {
+      deck.push({
+        id: crypto.randomUUID(),
+        color: 'wild',
+        value: 'wild_draw_four',
+        pointValue: 50
+      });
+    }
+
+    // 8 Wild Reverse Draw 4 (⇄ +4 đen)
     for (let i = 0; i < 8; i++) {
       deck.push({
         id: crypto.randomUUID(),
@@ -166,8 +176,8 @@ export class UnoDeck {
       });
     }
 
-    // 8 Wild Color Roulette
-    for (let i = 0; i < 8; i++) {
+    // 6 Wild Color Roulette
+    for (let i = 0; i < 6; i++) {
       deck.push({
         id: crypto.randomUUID(),
         color: 'wild',
@@ -176,8 +186,8 @@ export class UnoDeck {
       });
     }
 
-    // 4 Wild Draw 6
-    for (let i = 0; i < 4; i++) {
+    // 8 Wild Draw 6 (+6 đen)
+    for (let i = 0; i < 8; i++) {
       deck.push({
         id: crypto.randomUUID(),
         color: 'wild',
@@ -186,8 +196,18 @@ export class UnoDeck {
       });
     }
 
-    // 4 Wild Draw 10
-    for (let i = 0; i < 4; i++) {
+    // 8 Wild Draw 8 (+8 đen)
+    for (let i = 0; i < 8; i++) {
+      deck.push({
+        id: crypto.randomUUID(),
+        color: 'wild',
+        value: 'wild_draw_eight',
+        pointValue: 80
+      });
+    }
+
+    // 8 Wild Draw 10 (+10 đen)
+    for (let i = 0; i < 8; i++) {
       deck.push({
         id: crypto.randomUUID(),
         color: 'wild',
@@ -196,7 +216,7 @@ export class UnoDeck {
       });
     }
 
-    return deck; // Total: 80+12+8+12+12+12+8 + 8+8+4+4 = 168 cards
+    return deck;
   }
 
   public static createFlexDeck(): UnoCard[] {

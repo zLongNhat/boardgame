@@ -68,3 +68,43 @@ test('UnoGame - No Mercy 25-card elimination', () => {
   assert.deepStrictEqual(game.state.winners, ['p2'], 'Bob should be the winner');
   game.clearTurnTimer();
 });
+
+test('UnoGame - No Mercy +4 +6 +8 +10 Black Cards Stacking & Deck Composition', () => {
+  const { UnoDeck } = require('./UnoDeck');
+  const noMercyDeck = UnoDeck.createNoMercyDeck();
+
+  const wildFours = noMercyDeck.filter((c: any) => c.value === 'wild_draw_four');
+  const wildReverseFours = noMercyDeck.filter((c: any) => c.value === 'wild_reverse_draw_four');
+  const wildSixes = noMercyDeck.filter((c: any) => c.value === 'wild_draw_six');
+  const wildEights = noMercyDeck.filter((c: any) => c.value === 'wild_draw_eight');
+  const wildTens = noMercyDeck.filter((c: any) => c.value === 'wild_draw_ten');
+
+  assert.strictEqual(wildFours.length, 8, 'Should have 8 Wild Draw 4');
+  assert.strictEqual(wildReverseFours.length, 8, 'Should have 8 Wild Reverse Draw 4');
+  assert.strictEqual(wildSixes.length, 8, 'Should have 8 Wild Draw 6');
+  assert.strictEqual(wildEights.length, 8, 'Should have 8 Wild Draw 8');
+  assert.strictEqual(wildTens.length, 8, 'Should have 8 Wild Draw 10');
+
+  const players = [
+    { id: 'p1', name: 'Alice', avatar: 'av-1', isBot: false },
+    { id: 'p2', name: 'Bob', avatar: 'av-2', isBot: false }
+  ];
+
+  const game = new UnoGame(players, {
+    mode: 'no-mercy',
+    rules: { freeStacking: true }
+  });
+  game.start();
+
+  game.state.pendingDrawCount = 6;
+  game.state.pendingDrawType = 'wild_draw_six';
+
+  const cardEight = { id: 'c8', color: 'wild' as const, value: 'wild_draw_eight' as const, pointValue: 80 };
+  const cardFour = { id: 'c4', color: 'wild' as const, value: 'wild_draw_four' as const, pointValue: 50 };
+
+  // In No Mercy, can stack equal or higher penalty: +8 can stack on +6, +4 cannot stack on +6
+  assert.strictEqual(game.isPlayValid(cardEight, false, 'p1'), true, '+8 can stack on +6');
+  assert.strictEqual(game.isPlayValid(cardFour, false, 'p1'), false, '+4 cannot stack on +6 in No Mercy');
+
+  game.clearTurnTimer();
+});

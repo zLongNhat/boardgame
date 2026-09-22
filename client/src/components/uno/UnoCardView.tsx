@@ -95,85 +95,155 @@ export const UnoCardView: React.FC<UnoCardViewProps> = ({
   const style = colorStyles[effectiveColor] || colorStyles.red;
   const isWild = card.color === 'wild';
 
+const UnoReverseIcon: React.FC<{ isCenter?: boolean; className?: string }> = ({ isCenter = false, className = '' }) => (
+  <svg
+    viewBox="0 0 100 100"
+    className={isCenter ? `w-12 sm:w-14 h-12 sm:h-14 ${className}` : `w-3.5 h-3.5 sm:w-4 sm:h-4 ${className}`}
+    fill="currentColor"
+  >
+    {/* Classic Uno Two Curved Opposite Arrows */}
+    <path d="M 22 42 C 22 22, 38 13, 62 13 L 62 3 L 88 22 L 62 41 L 62 31 C 46 31, 36 37, 36 45 Z" />
+    <path d="M 78 58 C 78 78, 62 87, 38 87 L 38 97 L 12 78 L 38 59 L 38 69 C 54 69, 64 63, 64 55 Z" />
+  </svg>
+);
+
+const UnoWildOvalIcon: React.FC<{ size?: 'sm' | 'md'; className?: string }> = ({ size = 'md', className = '' }) => (
+  <svg
+    viewBox="0 0 100 130"
+    className={size === 'md' ? `w-11 sm:w-13 h-15 sm:h-18 -rotate-[28deg] drop-shadow-md ${className}` : `w-3.5 h-4.5 -rotate-[28deg] drop-shadow ${className}`}
+  >
+    <ellipse cx="50" cy="65" rx="48" ry="62" fill="#ffffff" stroke="#000000" strokeWidth="1" />
+    <g>
+      {/* Top-Right: Blue */}
+      <path d="M 50 65 L 50 3 A 46 60 0 0 1 96 65 Z" fill="#0099FF" />
+      {/* Bottom-Right: Green */}
+      <path d="M 50 65 L 96 65 A 46 60 0 0 1 50 125 Z" fill="#00C853" />
+      {/* Bottom-Left: Yellow */}
+      <path d="M 50 65 L 50 125 A 46 60 0 0 1 4 65 Z" fill="#FFD166" />
+      {/* Top-Left: Red */}
+      <path d="M 50 65 L 4 65 A 46 60 0 0 1 50 3 Z" fill="#E71D36" />
+    </g>
+    <ellipse cx="50" cy="65" rx="46" ry="60" fill="none" stroke="#ffffff" strokeWidth="3" />
+  </svg>
+);
+
   const renderCardSymbol = (val: string, isCenter = false) => {
     switch (val) {
       case 'skip':
         return <span className={isCenter ? 'text-3xl font-black' : 'text-xs font-black'}>⊘</span>;
       case 'reverse':
-        return <span className={isCenter ? 'text-3xl font-black' : 'text-xs font-black'}>⇄</span>;
+        return <UnoReverseIcon isCenter={isCenter} />;
       case 'draw_two':
         return <span className={isCenter ? 'text-2xl font-black' : 'text-[11px] font-black'}>+2</span>;
       case 'wild':
         return isCenter ? (
-          <div className="w-12 h-16 rounded-[50%] overflow-hidden grid grid-cols-2 grid-rows-2 shadow-md border-2 border-white -rotate-[28deg]">
-            <div className="bg-[#E71D36]" />
-            <div className="bg-[#0099FF]" />
-            <div className="bg-[#FFD166]" />
-            <div className="bg-[#00C853]" />
+          <UnoWildOvalIcon size="md" />
+        ) : (
+          <UnoWildOvalIcon size="sm" />
+        );
+      case 'wild_draw_two':
+        return isCenter ? (
+          <div className="relative flex items-center justify-center">
+            <UnoWildOvalIcon size="md" />
+            <span
+              className="absolute text-white font-black text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]"
+              style={{ textShadow: '0 0 6px #000, 1px 1px 3px #000' }}
+            >
+              +2
+            </span>
           </div>
         ) : (
-          <span className="text-[9px] font-black tracking-tighter">WILD</span>
+          <div className="flex items-center gap-0.5">
+            <UnoWildOvalIcon size="sm" />
+            <span className="text-[10px] font-black">+2</span>
+          </div>
         );
       case 'wild_draw_four':
         return isCenter ? (
           <div className="relative flex items-center justify-center">
-            <div className="w-12 h-16 rounded-[50%] overflow-hidden grid grid-cols-2 grid-rows-2 shadow-md border-2 border-white -rotate-[28deg]">
-              <div className="bg-[#E71D36]" />
-              <div className="bg-[#0099FF]" />
-              <div className="bg-[#FFD166]" />
-              <div className="bg-[#00C853]" />
-            </div>
-            <span className="absolute text-white font-black text-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">+4</span>
+            <UnoWildOvalIcon size="md" />
+            <span
+              className="absolute text-white font-black text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]"
+              style={{ textShadow: '0 0 6px #000, 1px 1px 3px #000' }}
+            >
+              +4
+            </span>
           </div>
         ) : (
-          <span className="text-[10px] font-black">+4</span>
+          <div className="flex items-center gap-0.5">
+            <UnoWildOvalIcon size="sm" />
+            <span className="text-[10px] font-black">+4</span>
+          </div>
         );
       case 'draw_four':
         return <span className={isCenter ? 'text-2xl font-black' : 'text-[10px] font-black'}>+4</span>;
       case 'wild_reverse_draw_four':
         return isCenter ? (
           <div className="relative flex items-center justify-center">
-            <div className="w-12 h-16 rounded-[50%] overflow-hidden grid grid-cols-2 grid-rows-2 shadow-md border-2 border-white -rotate-[28deg]">
-              <div className="bg-[#E71D36]" />
-              <div className="bg-[#0099FF]" />
-              <div className="bg-[#FFD166]" />
-              <div className="bg-[#00C853]" />
-            </div>
-            <div className="absolute text-white font-black drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] flex flex-col items-center leading-none">
-              <span className="text-xs">⇄</span>
-              <span className="text-lg">+4</span>
+            <UnoWildOvalIcon size="md" />
+            <div className="absolute flex flex-col items-center leading-none text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+              <UnoReverseIcon isCenter={false} />
+              <span className="text-base font-black" style={{ textShadow: '0 0 6px #000, 1px 1px 3px #000' }}>
+                +4
+              </span>
             </div>
           </div>
         ) : (
-          <span className="text-[8px] font-black">⇄+4</span>
+          <div className="flex items-center gap-0.5">
+            <UnoReverseIcon isCenter={false} />
+            <span className="text-[8px] font-black">+4</span>
+          </div>
         );
       case 'wild_draw_six':
         return isCenter ? (
           <div className="relative flex items-center justify-center">
-            <div className="w-12 h-16 rounded-[50%] overflow-hidden grid grid-cols-2 grid-rows-2 shadow-md border-2 border-white -rotate-[28deg]">
-              <div className="bg-[#E71D36]" />
-              <div className="bg-[#0099FF]" />
-              <div className="bg-[#FFD166]" />
-              <div className="bg-[#00C853]" />
-            </div>
-            <span className="absolute text-white font-black text-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">+6</span>
+            <UnoWildOvalIcon size="md" />
+            <span
+              className="absolute text-white font-black text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]"
+              style={{ textShadow: '0 0 6px #000, 1px 1px 3px #000' }}
+            >
+              +6
+            </span>
           </div>
         ) : (
-          <span className="text-[10px] font-black">+6</span>
+          <div className="flex items-center gap-0.5">
+            <UnoWildOvalIcon size="sm" />
+            <span className="text-[10px] font-black">+6</span>
+          </div>
+        );
+      case 'wild_draw_eight':
+        return isCenter ? (
+          <div className="relative flex items-center justify-center">
+            <UnoWildOvalIcon size="md" />
+            <span
+              className="absolute text-white font-black text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]"
+              style={{ textShadow: '0 0 6px #000, 1px 1px 3px #000' }}
+            >
+              +8
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-0.5">
+            <UnoWildOvalIcon size="sm" />
+            <span className="text-[10px] font-black">+8</span>
+          </div>
         );
       case 'wild_draw_ten':
         return isCenter ? (
           <div className="relative flex items-center justify-center">
-            <div className="w-12 h-16 rounded-[50%] overflow-hidden grid grid-cols-2 grid-rows-2 shadow-md border-2 border-white -rotate-[28deg]">
-              <div className="bg-[#E71D36]" />
-              <div className="bg-[#0099FF]" />
-              <div className="bg-[#FFD166]" />
-              <div className="bg-[#00C853]" />
-            </div>
-            <span className="absolute text-white font-black text-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">+10</span>
+            <UnoWildOvalIcon size="md" />
+            <span
+              className="absolute text-white font-black text-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]"
+              style={{ textShadow: '0 0 6px #000, 1px 1px 3px #000' }}
+            >
+              +10
+            </span>
           </div>
         ) : (
-          <span className="text-[9px] font-black">+10</span>
+          <div className="flex items-center gap-0.5">
+            <UnoWildOvalIcon size="sm" />
+            <span className="text-[9px] font-black">+10</span>
+          </div>
         );
       case 'skip_everyone':
         return <span className={isCenter ? 'text-lg font-black text-center leading-none' : 'text-[8px] font-black'}>CẤM HẾT</span>;

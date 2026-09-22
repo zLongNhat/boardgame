@@ -1,0 +1,43 @@
+# GitHub disables scheduled workflows in a repo after 60 consecutive days
+# without commits (issues/comments do NOT reset that timer). This job makes an
+# empty commit when the default branch has been quiet for 45+ days, keeping the
+# keep-alive ping cron (keep-alive.yml) running forever without manual pushes.
+#
+# Runs weekly so a skipped run still leaves a wide margin before day 60.
+# Commits are made with GITHUB_TOKEN: they still count as repo activity for the
+# 60-day timer, but they do NOT re-trigger other GitHub Actions workflows.
+# Note: the push does hit Render's webhook, so the service redeploys ~every
+# 45 days if you never push real code (harmless, but resets data/users.json).
+name: Keep repo active
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Monday 06:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Empty commit if quiet for 45+ days
+        run: |
+          set -euo pipefail
+          age=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+          echo "Last commit: ${age} days ago"
+          if [ "$age" -lt 45 ]; then
+            echo "Recent activity - nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive after ${age} quiet days"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

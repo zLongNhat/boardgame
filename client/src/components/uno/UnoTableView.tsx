@@ -21,7 +21,14 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
   const [selectedCardForWild, setSelectedCardForWild] = useState<{ card: UnoCard; index: number } | null>(null);
   const [selectedCardForSwap, setSelectedCardForSwap] = useState<{ card: UnoCard; index: number } | null>(null);
   const [isFlexPlay, setIsFlexPlay] = useState<boolean>(false);
+  const [flipCount, setFlipCount] = useState<number>(0);
   const [isDraggingCard, setIsDraggingCard] = useState<boolean>(false);
+
+  const handleToggleFlex = () => {
+    sounds.playCardWhoosh();
+    setFlipCount(c => c + 1);
+    setIsFlexPlay(prev => !prev);
+  };
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [orderedHand, setOrderedHand] = useState<UnoCard[]>(gameState.myHand);
   const handContainerRef = useRef<HTMLDivElement>(null);
@@ -323,14 +330,6 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Stacking Penalty Badge */}
-        {gameState.pendingDrawCount > 0 && (
-          <div className="absolute top-8 px-4 py-2 rounded-2xl bg-rose-600/95 text-white font-black text-sm flex items-center gap-2 shadow-2xl shadow-rose-600/50 animate-pulse border-2 border-amber-300 pointer-events-none">
-            <Flame className="w-5 h-5 text-amber-300" />
-            <span>+{gameState.pendingDrawCount} LÁ BÀI CỘNG DỒN!</span>
-          </div>
-        )}
       </div>
 
       {/* Catch UNO on opponents buttons */}
@@ -352,30 +351,62 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
         </div>
       )}
 
-      {/* Flex Power Indicator */}
+      {/* Flex Power Indicator: Placed in top-left screen corner to avoid overlapping any player seats */}
       {gameState.mode === 'flex' && (
-        <div className="absolute left-6 top-1/2 -translate-y-1/2 z-20 pointer-events-auto">
-          <button
-            onClick={() => setIsFlexPlay(!isFlexPlay)}
-            className={`p-3 rounded-2xl border flex flex-col items-center gap-1 transition-all ${
+        <div className="absolute left-4 sm:left-6 top-4 sm:top-6 z-30 pointer-events-auto">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleToggleFlex}
+            className={`px-3.5 py-2 rounded-2xl border-2 flex items-center gap-2.5 shadow-2xl backdrop-blur-md transition-all cursor-pointer ${
               isFlexPlay
-                ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-xl shadow-amber-500/30'
-                : 'bg-slate-900/80 border-slate-700 text-slate-400'
+                ? 'bg-gradient-to-r from-amber-500/90 to-yellow-500/90 border-yellow-300 text-slate-950 shadow-amber-500/40 ring-4 ring-amber-400/30'
+                : 'bg-slate-900/90 hover:bg-slate-800 border-slate-700 text-slate-300'
             }`}
+            title="Bấm để bật/tắt lật mặt Flex của bài"
           >
-            <Zap className="w-6 h-6" />
-            <span className="text-[10px] font-black uppercase tracking-wider">
-              Flex: {isFlexPlay ? 'BẬT' : 'TẮT'}
-            </span>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${myPlayer?.flexPowerActive ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
-              {myPlayer?.flexPowerActive ? 'Sẵn Sàng' : 'Đã Dùng'}
-            </span>
-          </button>
+            <div className={`p-1.5 rounded-xl ${isFlexPlay ? 'bg-slate-950/20 text-slate-950' : 'bg-amber-500/20 text-amber-400'}`}>
+              <Zap className="w-5 h-5 fill-current" />
+            </div>
+            <div className="flex flex-col items-start leading-tight">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-black uppercase tracking-wider">
+                  Flex Power
+                </span>
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                  isFlexPlay ? 'bg-slate-950 text-amber-300' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {isFlexPlay ? 'BẬT' : 'TẮT'}
+                </span>
+              </div>
+              <span className={`text-[10px] font-bold ${
+                myPlayer?.flexPowerActive ? (isFlexPlay ? 'text-slate-900 font-extrabold' : 'text-emerald-400') : 'text-rose-400'
+              }`}>
+                {myPlayer?.flexPowerActive ? '● Sẵn sàng lật bài' : '○ Đã dùng quyền'}
+              </span>
+            </div>
+          </motion.button>
         </div>
       )}
 
       {/* PLAYER'S HAND CARDS: ANCHORED AT THE BOTTOM OF THE TABLE */}
       <div className="absolute bottom-1 sm:bottom-2 left-0 right-0 flex flex-col items-center z-30 pointer-events-none">
+        {/* Stacking Penalty Badge: Positioned Down Here, Easily Visible & Never Overlapping Opponents */}
+        {gameState.pendingDrawCount > 0 && (
+          <motion.div
+            initial={{ scale: 0.9, y: 8, opacity: 0 }}
+            animate={{ scale: [1, 1.04, 1], y: 0, opacity: 1 }}
+            transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
+            className="mb-1.5 px-4 py-1.5 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-amber-600 text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-2xl shadow-rose-600/60 border-2 border-amber-300 pointer-events-auto"
+          >
+            <Flame className="w-4 h-4 text-amber-300 fill-amber-300 animate-bounce" />
+            <span className="tracking-wide">+{gameState.pendingDrawCount} LÁ BÀI CỘNG DỒN!</span>
+            <span className="text-[10px] font-bold bg-black/40 px-2 py-0.5 rounded-lg border border-white/20 hidden sm:inline">
+              Đè lá phạt tương đương hoặc rút bài
+            </span>
+          </motion.div>
+        )}
+
         {/* Hand Status Bar & Sorting */}
         <div className="mb-1 flex items-center gap-2.5 text-xs font-semibold text-slate-300 pointer-events-auto">
           <span>Bài của bạn: <strong className="text-white">{totalCards} lá</strong></span>
@@ -469,14 +500,27 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
                     if (!isMyTurn && !canJumpIn) return;
                     handleCardClick(card, i);
                   }}
-                  style={{ zIndex: isHovered ? 90 : fan.zIndex }}
+                  style={{ zIndex: isHovered ? 90 : fan.zIndex, perspective: 1000 }}
                   className="flex-shrink-0 w-20 sm:w-24 h-28 sm:h-36 cursor-grab active:cursor-grabbing select-none"
                 >
-                  <UnoCardView
-                    card={card}
-                    isFlex={isFlexPlay}
-                    className="w-full h-full shadow-2xl"
-                  />
+                  <motion.div
+                    key={`card-flip-${card.id}-${flipCount}`}
+                    initial={flipCount > 0 && (card.flexColor || card.flexValue) ? { rotateY: 90, scale: 0.92 } : false}
+                    animate={{ rotateY: 0, scale: 1 }}
+                    transition={{
+                      duration: 0.32,
+                      ease: [0.22, 1, 0.36, 1],
+                      delay: (card.flexColor || card.flexValue) ? (i % 7) * 0.04 : 0
+                    }}
+                    style={{ transformStyle: 'preserve-3d' }}
+                    className="w-full h-full"
+                  >
+                    <UnoCardView
+                      card={card}
+                      isFlex={isFlexPlay}
+                      className="w-full h-full shadow-2xl"
+                    />
+                  </motion.div>
 
                   {/* Jump-in button overlay if valid and not turn */}
                   {!isMyTurn && gameState.rules.jumpIn && (card.color === gameState.topCard.color && card.value === gameState.topCard.value) && (
