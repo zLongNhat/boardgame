@@ -22,6 +22,10 @@ export default {
           dark: '#1e293b'
         }
       },
+      fontFamily: {
+        sans: ['"Be Vietnam Pro"', '"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['"Plus Jakarta Sans"', '"Be Vietnam Pro"', 'sans-serif'],
+      },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'bounce-short': 'bounce 0.8s ease-in-out infinite'

@@ -83,12 +83,17 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
   const handleCardClick = (card: EKCard, index?: number) => {
     const idx = index !== undefined ? index : gameState.myHand.findIndex(c => c.id === card.id);
 
-    // If not player's turn, ONLY 'nope' card is permitted during an active Nope window
-    if (!isMyTurn) {
-      if (card.type === 'nope' && gameState.pendingAction) {
+    // During an active Nope window, ONLY 'nope' cards are permitted for ANY player
+    if (gameState.pendingAction) {
+      if (card.type === 'nope') {
         triggerPlayAnimation(card, idx);
         onSendAction({ type: 'PLAY_NOPE', cardId: card.id });
       }
+      return;
+    }
+
+    // If not player's turn, cannot play anything
+    if (!isMyTurn) {
       return;
     }
 
@@ -294,7 +299,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
 
       {/* 3-Second NOPE Reaction Global Overlay */}
       {gameState.pendingAction && (
-        <div className="fixed inset-x-0 top-20 z-50 flex justify-center px-4">
+        <div className="fixed inset-x-0 top-20 z-50 flex justify-center px-4 pointer-events-auto">
           <div className="bg-slate-900/95 border-2 border-rose-500/60 rounded-3xl p-5 max-w-lg w-full shadow-2xl shadow-rose-950/80 backdrop-blur-md animate-pulse">
             <div className="flex items-center justify-between mb-2">
               <span className="font-extrabold text-rose-400 text-sm flex items-center gap-1.5">
@@ -320,7 +325,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                   }
                 }}
                 disabled={!hasNope}
-                className="flex-1 py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition-all uppercase tracking-wider"
+                className="flex-1 py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition-all uppercase tracking-wider cursor-pointer"
               >
                 <XCircle className="w-4 h-4" />
                 CHẶN NOPE NGAY! {hasNope ? '(Có thẻ)' : '(Không có thẻ)'}
@@ -332,7 +337,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
 
       {/* 10-Second Defusal Emergency Modal */}
       {isDefusing && (
-        <div className="fixed inset-0 z-50 bg-rose-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-rose-950/85 backdrop-blur-md flex items-center justify-center p-4 pointer-events-auto">
           <div className="bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 animate-bounce">
               <AlertTriangle className="w-8 h-8" />
@@ -354,10 +359,10 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                     <button
                       key={pos.id}
                       onClick={() => setDefuseInsertion(pos.id as any)}
-                      className={`p-3 rounded-xl border text-xs font-bold transition-all ${
+                      className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                         defuseInsertion === pos.id
                           ? 'border-emerald-500 bg-emerald-500/20 text-emerald-300'
-                          : 'border-slate-800 bg-slate-950 text-slate-400'
+                          : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
                       }`}
                     >
                       {pos.label}
@@ -367,7 +372,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
 
                 <button
                   onClick={handleConfirmDefuse}
-                  className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-xl shadow-emerald-600/30 transition-all uppercase tracking-wider"
+                  className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-xl shadow-emerald-600/30 transition-all uppercase tracking-wider cursor-pointer"
                 >
                   🛠️ Đánh Thẻ Gỡ Bom &amp; Tự Cứu Mình
                 </button>
@@ -381,8 +386,20 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
 
       {/* "See The Future" Private 3-Card Modal */}
       {seeFutureCards && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-fuchsia-500/40 rounded-3xl p-6 max-w-lg w-full text-center shadow-2xl">
+        <div
+          onClick={onCloseSeeFuture}
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 pointer-events-auto"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-slate-900 border border-fuchsia-500/40 rounded-3xl p-6 max-w-lg w-full text-center shadow-2xl"
+          >
+            <button
+              onClick={onCloseSeeFuture}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white text-base font-bold w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 hover:border-slate-500 transition-colors cursor-pointer"
+            >
+              ✕
+            </button>
             <h3 className="text-lg font-black text-fuchsia-400 mb-2 flex items-center justify-center gap-2">
               <Eye className="w-5 h-5" />
               SOI TƯƠNG LAI (3 Lá Trên Cùng)
@@ -400,7 +417,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
 
             <button
               onClick={onCloseSeeFuture}
-              className="py-3 px-6 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs"
+              className="py-3 px-6 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer"
             >
               Đóng &amp; Giữ Bí Mật
             </button>
@@ -410,7 +427,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
 
       {/* Favor Give Card Modal */}
       {isTargetOfFavor && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 pointer-events-auto">
           <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 max-w-md w-full text-center shadow-2xl">
             <h3 className="text-base font-black text-purple-300 mb-2">BẠN PHẢI GIAO NỘP 1 LÁ BÀI!</h3>
             <p className="text-xs text-slate-400 mb-4">Bấm chọn 1 lá bài trên tay bạn để trao cho đối thủ:</p>
@@ -427,8 +444,26 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
 
       {/* Target Opponent Picker (Favor / Cat Combos) */}
       {targetModalType && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-sm w-full shadow-2xl">
+        <div
+          onClick={() => {
+            setTargetModalType(null);
+            setPendingCardForAction(null);
+          }}
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-sm w-full shadow-2xl"
+          >
+            <button
+              onClick={() => {
+                setTargetModalType(null);
+                setPendingCardForAction(null);
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white text-base font-bold w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 hover:border-slate-500 transition-colors cursor-pointer"
+            >
+              ✕
+            </button>
             <h3 className="text-base font-bold text-white mb-1">Chọn Người Chơi Mục Tiêu</h3>
             <p className="text-xs text-slate-400 mb-4">
               {targetModalType === 'favor' ? 'Đòi bài từ người chơi:' : 'Cướp 1 lá bài ngẫu nhiên từ:'}
@@ -440,7 +475,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                   <button
                     key={p.id}
                     onClick={() => handleSelectOpponent(p.id)}
-                    className="w-full p-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-between text-xs font-black transition-all"
+                    className="w-full p-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-between text-xs font-black transition-all cursor-pointer"
                   >
                     <span>{p.name}</span>
                     <span className="text-amber-300">{p.cardCount} lá</span>
@@ -448,8 +483,11 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                 ))}
             </div>
             <button
-              onClick={() => setTargetModalType(null)}
-              className="mt-4 w-full py-2.5 bg-slate-800 text-xs text-slate-400 hover:text-white rounded-xl"
+              onClick={() => {
+                setTargetModalType(null);
+                setPendingCardForAction(null);
+              }}
+              className="mt-4 w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 hover:text-white rounded-xl cursor-pointer"
             >
               Hủy
             </button>
@@ -493,7 +531,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                     stiffness: 380,
                     damping: 24
                   }}
-                  drag={isMyTurn || (card.type === 'nope' && !!gameState.pendingAction)}
+                  drag={(!gameState.pendingAction && isMyTurn) || (card.type === 'nope' && !!gameState.pendingAction)}
                   dragSnapToOrigin={true}
                   dragElastic={0.15}
                   onDragStart={() => {
@@ -502,9 +540,9 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                   }}
                   onDragEnd={(_, info) => {
                     setIsDraggingCard(false);
-                    // Guard: only allow action if it's my turn or nope during pending action
+                    // Guard: only allow action if it's my turn and no pending action, or nope during pending action
                     const canNope = card.type === 'nope' && !!gameState.pendingAction;
-                    if (!isMyTurn && !canNope) return;
+                    if (!canNope && (!isMyTurn || !!gameState.pendingAction)) return;
                     if (isDroppedInZone(info.point, 'ek-drop-zone')) {
                       handleCardClick(card, i);
                     }
@@ -517,7 +555,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
                   }}
                   onClick={() => {
                     const canNope = card.type === 'nope' && !!gameState.pendingAction;
-                    if (!isMyTurn && !canNope) return;
+                    if (!canNope && (!isMyTurn || !!gameState.pendingAction)) return;
                     handleCardClick(card, i);
                   }}
                   style={{ zIndex: isHovered ? 90 : (isSelected ? 50 : fan.zIndex) }}

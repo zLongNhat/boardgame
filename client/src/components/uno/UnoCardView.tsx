@@ -176,14 +176,14 @@ export const UnoCardView: React.FC<UnoCardViewProps> = ({
           <span className="text-[9px] font-black">+10</span>
         );
       case 'skip_everyone':
-        return <span className={isCenter ? 'text-xl font-black text-center leading-none' : 'text-[9px] font-black'}>⊘ ALL</span>;
+        return <span className={isCenter ? 'text-lg font-black text-center leading-none' : 'text-[8px] font-black'}>CẤM HẾT</span>;
       case 'discard_all':
-        return <span className={isCenter ? 'text-lg font-black text-center leading-none' : 'text-[9px] font-black'}>DISC ALL</span>;
+        return <span className={isCenter ? 'text-lg font-black text-center leading-none' : 'text-[8px] font-black'}>BỎ HẾT</span>;
       case 'wild_color_roulette':
         return isCenter ? (
-          <div className="text-center font-black text-xs text-amber-300">ROULETTE</div>
+          <div className="text-center font-black text-xs text-amber-300">VÒNG QUAY</div>
         ) : (
-          <span className="text-[8px] font-black">ROUL</span>
+          <span className="text-[7px] font-black">QUAY</span>
         );
       case 'flex_all_flip':
         return <span className={isCenter ? 'text-2xl font-black' : 'text-xs font-black'}>🔄</span>;

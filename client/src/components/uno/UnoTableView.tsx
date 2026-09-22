@@ -465,7 +465,7 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
       {selectedCardForWild && (
         <div
           onClick={() => setSelectedCardForWild(null)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 pointer-events-auto"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -509,7 +509,7 @@ export const UnoTableView: React.FC<UnoTableViewProps> = ({
       {selectedCardForSwap && (
         <div
           onClick={() => setSelectedCardForSwap(null)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 pointer-events-auto"
         >
           <div
             onClick={(e) => e.stopPropagation()}

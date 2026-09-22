@@ -31,7 +31,7 @@ const GameContent: React.FC = () => {
     // If gameState or player is still synchronizing from server, display loading spinner instead of falling back to lobby
     if (!gameState || !player) {
       return (
-        <div className="w-full h-screen bg-slate-950 flex flex-col items-center justify-center text-white gap-4 font-['Outfit',sans-serif]">
+        <div className="w-full h-screen bg-slate-950 flex flex-col items-center justify-center text-white gap-4 font-sans">
           <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-xl font-bold tracking-wide animate-pulse">Đang tải ván chơi...</p>
         </div>

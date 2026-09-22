@@ -20,16 +20,13 @@ export const EKCardView: React.FC<EKCardViewProps> = ({
         style={{ aspectRatio: '5 / 7.5' }}
       >
         <div className="w-full h-full rounded-xl bg-gradient-to-br from-red-700 via-rose-800 to-black flex flex-col items-center justify-between p-2 relative overflow-hidden border border-red-500/50">
-          <div className="text-[10px] font-black tracking-widest text-red-400/80 uppercase">TOP SECRET</div>
+          <div className="text-[10px] font-black tracking-widest text-red-400/80 uppercase">TUYỆT MẬT</div>
           <div className="w-12 h-12 rounded-full bg-black/60 border border-red-500/50 flex items-center justify-center text-2xl shadow-lg">
             💣
           </div>
           <div className="text-center">
-            <span className="block text-[9px] font-black uppercase tracking-tighter text-amber-300 leading-none">
-              EXPLODING
-            </span>
-            <span className="block text-[11px] font-black uppercase tracking-tight text-white leading-none">
-              KITTENS
+            <span className="block text-[11px] sm:text-xs font-black uppercase tracking-tight text-amber-300 leading-none">
+              MÈO NỔ
             </span>
           </div>
         </div>
@@ -175,14 +172,14 @@ export const EKCardView: React.FC<EKCardViewProps> = ({
       <div className="flex-1 flex flex-col items-center justify-center my-0.5">
         <span className="text-3xl sm:text-4xl drop-shadow-md">{theme.icon}</span>
         <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-tight text-center leading-tight mt-0.5">
-          {card.name}
+          {theme.title}
         </span>
       </div>
 
       {/* Bottom Description */}
       <div className="border-t pt-0.5 border-slate-200">
         <p className="text-[7.5px] leading-[9px] text-slate-600 font-medium line-clamp-2 text-center">
-          {card.description || theme.desc}
+          {theme.desc}
         </p>
       </div>
     </div>

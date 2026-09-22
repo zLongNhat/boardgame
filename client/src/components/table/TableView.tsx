@@ -408,7 +408,7 @@ export const TableView: React.FC<TableViewProps> = ({
   const myEmoji = AVATAR_EMOJIS[player.avatar] || '👤';
 
   return (
-    <div className="relative min-h-screen bg-black text-slate-100 flex flex-col justify-between overflow-hidden font-['Outfit',sans-serif]">
+    <div className="relative min-h-screen bg-black text-slate-100 flex flex-col justify-between overflow-hidden font-sans">
       {/* Top Header Bar */}
       <div className="z-30 flex items-center justify-between px-4 py-2 bg-black/60 backdrop-blur-md border-b border-white/10">
         <div className="flex items-center gap-3">
@@ -707,7 +707,7 @@ export const TableView: React.FC<TableViewProps> = ({
                   className="text-3xl sm:text-4xl font-black italic tracking-tighter text-yellow-300 select-none transform -skew-x-12"
                   style={{
                     textShadow: '3px 3px 0px #b91c1c, -1px -1px 0px #fff',
-                    fontFamily: "'Fredoka', 'Outfit', sans-serif"
+                    fontFamily: "'Plus Jakarta Sans', 'Be Vietnam Pro', sans-serif"
                   }}
                 >
                   UNO

@@ -90,7 +90,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
     const winRate = totalGames > 0 && user ? Math.round((user.stats.totalWins / totalGames) * 100) : 0;
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-start p-4 sm:p-8 font-['Outfit',sans-serif]">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 flex flex-col items-center justify-start p-4 sm:p-8 font-sans">
         {/* Top User Bar */}
         <div className="w-full max-w-4xl flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800/80">
           <div className="flex items-center gap-3">
@@ -376,7 +376,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-4 sm:p-6 lg:p-8 font-['Outfit',sans-serif]">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col p-4 sm:p-6 lg:p-8 font-sans">
       {/* Top Navigation Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800">
         <div className="flex items-center gap-3">
