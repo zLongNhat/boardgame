@@ -5,7 +5,7 @@ import { MaskedTLGameState, Suit, TLCard } from '../../types/game';
 import { sounds } from '../../utils/sound';
 import { calcFanTransform, isDroppedInZone } from '../../utils/cardFan';
 import { syncHandOrder, reorderHand, calcReorderIndex, sortTLCards } from '../../utils/handReorder';
-import { getSuggestedCombos } from '../../utils/tienLenSuggestions';
+import { getSuggestedCombos, findMatchingComboForCard } from '../../utils/tienLenSuggestions';
 
 interface TienLenTableViewProps {
   gameState: MaskedTLGameState;
@@ -22,6 +22,7 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
   const [sortBy, setSortBy] = useState<'rank' | 'suit' | 'custom'>('rank');
   const [isDraggingCard, setIsDraggingCard] = useState<boolean>(false);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+  const [autoSelectCombo, setAutoSelectCombo] = useState<boolean>(true);
   const [slidingCards, setSlidingCards] = useState<TLCard[] | null>(null);
   const [displayedTrick, setDisplayedTrick] = useState<any>(gameState.currentTrick);
   const [orderedHand, setOrderedHand] = useState<TLCard[]>(() => sortTLCards(gameState.myHand, 'rank'));
@@ -188,12 +189,45 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
     return getSuggestedCombos(gameState.myHand, gameState.currentTrick, isFirstTurnWithThreeSpades);
   }, [gameState.myHand, gameState.currentTrick, isMyTurn, hasPassed, isFirstTurnWithThreeSpades]);
 
-  const toggleSelectCard = (id: string) => {
+  // Hovered combo detector: when mouse hovers over any card, find matching playable combo
+  const hoveredCombo = useMemo(() => {
+    if (!hoveredCardId) return null;
+    return findMatchingComboForCard(
+      hoveredCardId,
+      gameState.myHand,
+      gameState.currentTrick,
+      isFirstTurnWithThreeSpades
+    );
+  }, [hoveredCardId, gameState.myHand, gameState.currentTrick, isFirstTurnWithThreeSpades]);
+
+  const hoveredComboIds = useMemo(() => {
+    if (!hoveredCombo) return hoveredCardId ? [hoveredCardId] : [];
+    return hoveredCombo.map(c => c.id);
+  }, [hoveredCombo, hoveredCardId]);
+
+  const handleCardClick = (card: TLCard) => {
     sounds.playCardSnap();
-    if (selectedCardIds.includes(id)) {
-      setSelectedCardIds(selectedCardIds.filter(i => i !== id));
+
+    // If auto combo select is enabled and hovered combo contains this card with > 1 cards
+    if (autoSelectCombo && hoveredCombo && hoveredCombo.length > 1 && hoveredCombo.some(c => c.id === card.id)) {
+      const comboIds = hoveredCombo.map(c => c.id);
+      const allComboSelected = comboIds.every(id => selectedCardIds.includes(id));
+
+      if (allComboSelected) {
+        // Player clicks a card in the selected combo to deselect that card individually ("người chơi muốn sẽ tự bấm không chọn")
+        setSelectedCardIds(selectedCardIds.filter(id => id !== card.id));
+      } else {
+        // Select all cards in this combination
+        setSelectedCardIds(comboIds);
+      }
+      return;
+    }
+
+    // Default toggle
+    if (selectedCardIds.includes(card.id)) {
+      setSelectedCardIds(selectedCardIds.filter(i => i !== card.id));
     } else {
-      setSelectedCardIds([...selectedCardIds, id]);
+      setSelectedCardIds([...selectedCardIds, card.id]);
     }
   };
 
@@ -475,6 +509,22 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
                 : 'Xếp bài: Theo chất (♠➔♥)'}
             </button>
 
+            {/* Quick Toggle for Auto-Combo Selection */}
+            <button
+              onClick={() => {
+                sounds.playCardSnap();
+                setAutoSelectCombo(prev => !prev);
+              }}
+              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
+                autoSelectCombo
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30'
+                  : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white'
+              }`}
+              title="Tự động chọn cả bộ gợi ý khi bấm vào một lá bài. Tắt nếu muốn tự bấm chọn từng lá thủ công."
+            >
+              <span>{autoSelectCombo ? '⚡ Chọn cả bộ: BẬT' : '🖐 Chọn lẻ: BẬT'}</span>
+            </button>
+
             {comboPreview && (
               <span className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
                 comboPreview.includes('CHẶT')
@@ -518,7 +568,8 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
             {orderedHand.map((card, i) => {
               const isSelected = selectedCardIds.includes(card.id);
               const fan = calcFanTransform(i, totalCards);
-              const isHovered = hoveredCardId === card.id && !isDraggingCard;
+              const isDirectlyHovered = hoveredCardId === card.id && !isDraggingCard;
+              const isInHoveredCombo = hoveredComboIds.includes(card.id) && !isDraggingCard;
 
               return (
                 <motion.div
@@ -528,10 +579,10 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
                   onMouseLeave={() => setHoveredCardId(null)}
                   initial={{ rotate: fan.rotate, y: fan.y, opacity: 0, scale: 0.9 }}
                   animate={{
-                    rotate: isSelected ? 0 : (isHovered ? 0 : fan.rotate),
-                    y: isSelected ? fan.y - 28 : (isHovered ? -40 : fan.y),
+                    rotate: isSelected ? 0 : (isInHoveredCombo ? 0 : fan.rotate),
+                    y: isSelected ? (isInHoveredCombo ? fan.y - 36 : fan.y - 28) : (isInHoveredCombo ? -40 : fan.y),
                     opacity: 1,
-                    scale: isSelected ? 1.08 : (isHovered ? 1.15 : 1)
+                    scale: isSelected ? (isInHoveredCombo ? 1.12 : 1.08) : (isInHoveredCombo ? 1.15 : 1)
                   }}
                   transition={{ type: 'spring', stiffness: 380, damping: 24 }}
                   drag={true}
@@ -573,14 +624,40 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
                     rotate: 0,
                     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)'
                   }}
-                  onClick={() => toggleSelectCard(card.id)}
-                  style={{ zIndex: isHovered ? 90 : (isSelected ? 50 : fan.zIndex) }}
-                  className={`flex-shrink-0 w-20 sm:w-24 h-32 sm:h-36 rounded-2xl bg-white border-2 shadow-xl flex flex-col justify-between p-2.5 cursor-grab active:cursor-grabbing select-none transition-shadow ${
+                  onClick={() => handleCardClick(card)}
+                  style={{ zIndex: isDirectlyHovered ? 100 : (isInHoveredCombo ? 95 : (isSelected ? 50 : fan.zIndex)) }}
+                  className={`relative flex-shrink-0 w-20 sm:w-24 h-32 sm:h-36 rounded-2xl bg-white border-2 shadow-xl flex flex-col justify-between p-2.5 cursor-grab active:cursor-grabbing select-none transition-shadow ${
                     getSuitColor(card.suit)
                   } ${
-                    isSelected ? 'ring-4 ring-indigo-500 border-indigo-400' : 'border-slate-300'
+                    isInHoveredCombo
+                      ? 'ring-4 ring-amber-400 border-amber-300 shadow-2xl shadow-amber-500/40'
+                      : isSelected
+                      ? 'ring-4 ring-indigo-500 border-indigo-400'
+                      : 'border-slate-300'
                   }`}
                 >
+                  {/* Badge when card is part of a multi-card hovered combo */}
+                  {isInHoveredCombo && hoveredCombo && hoveredCombo.length > 1 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4, scale: 0.8 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[9px] shadow-md uppercase tracking-wider whitespace-nowrap z-50 pointer-events-none flex items-center gap-0.5"
+                    >
+                      <span>✨</span>
+                      <span>
+                        {hoveredCombo.length === 4 && hoveredCombo[0].rankValue === hoveredCombo[1].rankValue
+                          ? 'Tứ Quý'
+                          : hoveredCombo.length >= 6 && isConsecutivePairs(hoveredCombo, hoveredCombo.length / 2)
+                          ? `${hoveredCombo.length / 2} Đôi Thông`
+                          : hoveredCombo.length >= 3 && hoveredCombo[0].rankValue !== hoveredCombo[1].rankValue
+                          ? `Sảnh ${hoveredCombo.length}`
+                          : hoveredCombo.length === 3
+                          ? 'Sám'
+                          : 'Đôi'}
+                      </span>
+                    </motion.div>
+                  )}
+
                   <div className="text-sm self-start leading-none font-bold">
                     {card.value}
                     <span className="text-base">{getSuitIcon(card.suit)}</span>

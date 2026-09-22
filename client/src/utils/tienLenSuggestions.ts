@@ -475,3 +475,207 @@ export function getSuggestedCombos(
 
   return suggestions;
 }
+
+/**
+ * Given a hovered cardId and the current hand + table trick,
+ * finds a playable combo that includes this card and beats the current trick (or forms a natural combo in free play).
+ */
+export function findMatchingComboForCard(
+  cardId: string,
+  hand: TLCard[],
+  currentTrick: PlayedTrick | null,
+  isFirstTurnWithThreeSpades: boolean = false
+): TLCard[] | null {
+  if (!hand || hand.length === 0 || !cardId) return null;
+  const targetCard = hand.find(c => c.id === cardId);
+  if (!targetCard) return null;
+
+  // Case 1: First turn with 3 of Spades required
+  if (isFirstTurnWithThreeSpades && currentTrick === null) {
+    const threeSpades = hand.find(c => c.value === '3' && c.suit === 'spades');
+    if (!threeSpades) return [targetCard];
+
+    // If targetCard is 3 of Spades itself
+    if (targetCard.id === threeSpades.id) {
+      // Check if there's a straight with 3S
+      const straights = findStraights(hand, 3).filter(s => s.some(c => c.id === threeSpades.id));
+      if (straights.length > 0) return straights[0];
+
+      // Check if there's a pair with 3S
+      const otherThrees = hand.filter(c => c.value === '3' && c.id !== threeSpades.id);
+      if (otherThrees.length > 0) return [threeSpades, otherThrees[0]];
+
+      return [threeSpades];
+    }
+
+    // If target is another card: does it form a combo with 3S?
+    if (targetCard.value === '3') {
+      return [threeSpades, targetCard];
+    }
+    const straightWithBoth = findStraights(hand, 3).find(
+      s => s.some(c => c.id === threeSpades.id) && s.some(c => c.id === targetCard.id)
+    );
+    if (straightWithBoth) return straightWithBoth;
+
+    return null; // Not playable on first turn if it doesn't include 3S
+  }
+
+  // Case 2: An active trick is on the table
+  if (currentTrick) {
+    const curr = currentTrick.combo;
+    const isSingleTwo = curr.type === 'single' && curr.cards[0].rankValue === 15;
+    const isPairTwo = curr.type === 'pair' && curr.cards[0].rankValue === 15;
+
+    // 4 Đôi thông can cut: 1 Heo, Đôi Heo, 3 Đôi thông, Tứ Quý, 4 Đôi thông nhỏ hơn
+    const allFourPairs = findFourPairSequences(hand);
+    const fourPairWithCard = allFourPairs.find(fp => fp.some(c => c.id === targetCard.id));
+    if (fourPairWithCard) {
+      if (isSingleTwo || isPairTwo || curr.type === 'three_pair_sequence' || curr.type === 'four_of_a_kind') {
+        return fourPairWithCard;
+      }
+      if (
+        curr.type === 'four_pair_sequence' &&
+        fourPairWithCard[fourPairWithCard.length - 1].overallRank > curr.highestCard.overallRank
+      ) {
+        return fourPairWithCard;
+      }
+    }
+
+    // Tứ quý can cut: 1 Heo, Đôi Heo, 3 Đôi thông, Tứ Quý nhỏ hơn
+    const allFours = findFourOfAKind(hand);
+    const fourWithCard = allFours.find(f => f.some(c => c.id === targetCard.id));
+    if (fourWithCard) {
+      if (isSingleTwo || isPairTwo || curr.type === 'three_pair_sequence') {
+        return fourWithCard;
+      }
+      if (curr.type === 'four_of_a_kind' && fourWithCard[3].overallRank > curr.highestCard.overallRank) {
+        return fourWithCard;
+      }
+    }
+
+    // 3 Đôi thông can cut: 1 Heo, 3 Đôi thông nhỏ hơn
+    const allThreePairs = findThreePairSequences(hand);
+    const threePairWithCard = allThreePairs.find(tp => tp.some(c => c.id === targetCard.id));
+    if (threePairWithCard) {
+      if (isSingleTwo) {
+        return threePairWithCard;
+      }
+      if (
+        curr.type === 'three_pair_sequence' &&
+        threePairWithCard[threePairWithCard.length - 1].overallRank > curr.highestCard.overallRank
+      ) {
+        return threePairWithCard;
+      }
+    }
+
+    // Normal matching combo types:
+    if (curr.type === 'single') {
+      if (targetCard.overallRank > curr.highestCard.overallRank) {
+        return [targetCard];
+      }
+      return null;
+    }
+
+    if (curr.type === 'pair') {
+      const sameRank = hand.filter(c => c.rankValue === targetCard.rankValue);
+      if (sameRank.length >= 2) {
+        const candidates = sameRank.filter(c => c.id !== targetCard.id);
+        for (const partner of candidates) {
+          const pair = [targetCard, partner].sort((a, b) => a.overallRank - b.overallRank);
+          if (pair[1].overallRank > curr.highestCard.overallRank) {
+            return pair;
+          }
+        }
+      }
+      return null;
+    }
+
+    if (curr.type === 'triple') {
+      const sameRank = hand.filter(c => c.rankValue === targetCard.rankValue);
+      if (sameRank.length >= 3) {
+        const others = sameRank.filter(c => c.id !== targetCard.id);
+        const triple = [targetCard, others[0], others[1]].sort((a, b) => a.overallRank - b.overallRank);
+        if (triple[2].overallRank > curr.highestCard.overallRank) {
+          return triple;
+        }
+      }
+      return null;
+    }
+
+    if (curr.type === 'straight') {
+      const targetLen = curr.length;
+      const nonTwos = hand.filter(c => c.rankValue !== 15);
+      const byRank = new Map<number, TLCard[]>();
+      for (const c of nonTwos) {
+        const arr = byRank.get(c.rankValue) || [];
+        arr.push(c);
+        byRank.set(c.rankValue, arr);
+      }
+      const uniqueRanks = Array.from(byRank.keys()).sort((a, b) => a - b);
+
+      const validStraights: TLCard[][] = [];
+      for (let i = 0; i <= uniqueRanks.length - targetLen; i++) {
+        let isConsecutive = true;
+        for (let k = 0; k < targetLen - 1; k++) {
+          if (uniqueRanks[i + k + 1] !== uniqueRanks[i + k] + 1) {
+            isConsecutive = false;
+            break;
+          }
+        }
+        if (isConsecutive) {
+          const runRanks = uniqueRanks.slice(i, i + targetLen);
+          if (runRanks.includes(targetCard.rankValue)) {
+            const straightCards: TLCard[] = [];
+            for (const r of runRanks) {
+              if (r === targetCard.rankValue) {
+                straightCards.push(targetCard);
+              } else {
+                const rCards = byRank.get(r)!;
+                straightCards.push(rCards[rCards.length - 1]);
+              }
+            }
+            const highestInStraight = straightCards[straightCards.length - 1];
+            if (highestInStraight.overallRank > curr.highestCard.overallRank) {
+              validStraights.push(straightCards);
+            }
+          }
+        }
+      }
+      if (validStraights.length > 0) {
+        return validStraights[0];
+      }
+      return null;
+    }
+
+    return null;
+  }
+
+  // Case 3: Free play (no active trick on table)
+  const allFourPairs = findFourPairSequences(hand);
+  const fp = allFourPairs.find(seq => seq.some(c => c.id === targetCard.id));
+  if (fp) return fp;
+
+  const allFours = findFourOfAKind(hand);
+  const f = allFours.find(seq => seq.some(c => c.id === targetCard.id));
+  if (f) return f;
+
+  const allThreePairs = findThreePairSequences(hand);
+  const tp = allThreePairs.find(seq => seq.some(c => c.id === targetCard.id));
+  if (tp) return tp;
+
+  const sameRank = hand.filter(c => c.rankValue === targetCard.rankValue);
+  if (sameRank.length === 3) {
+    return [...sameRank].sort((a, b) => a.overallRank - b.overallRank);
+  }
+
+  for (let len = 5; len >= 3; len--) {
+    const straights = findStraights(hand, len).filter(s => s.some(c => c.id === targetCard.id));
+    if (straights.length > 0) return straights[0];
+  }
+
+  if (sameRank.length === 2) {
+    return [...sameRank].sort((a, b) => a.overallRank - b.overallRank);
+  }
+
+  return [targetCard];
+}
