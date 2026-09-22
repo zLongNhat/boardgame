@@ -167,15 +167,9 @@ export class RoomManager {
       return { success: false, message: 'Game in this room is already in progress.' };
     }
 
-    const maxCapacities: Record<GameType, number> = {
-      'uno': 8,
-      'exploding-kittens': 5,
-      'tien-len': 4
-    };
-
-    const maxAllowed = maxCapacities[room.settings.gameType];
+    const maxAllowed = this.getMaxCapacity(room);
     if (room.players.length >= maxAllowed) {
-      return { success: false, message: `Room is full for ${room.settings.gameType.toUpperCase()} (max ${maxAllowed} players).` };
+      return { success: false, message: `Phòng đã đầy cho ${room.settings.gameType.toUpperCase()} (Tối đa ${maxAllowed} người chơi). Bật thêm bản mở rộng để tăng sức chứa phòng!` };
     }
 
     const newPlayer: RoomPlayer = {
@@ -204,15 +198,9 @@ export class RoomManager {
     if (room.hostId !== requesterId) return { success: false, message: 'Only the host can add bots.' };
     if (room.inGame) return { success: false, message: 'Cannot add bots while game is running.' };
 
-    const maxCapacities: Record<GameType, number> = {
-      'uno': 8,
-      'exploding-kittens': 5,
-      'tien-len': 4
-    };
-
-    const maxAllowed = maxCapacities[room.settings.gameType];
+    const maxAllowed = this.getMaxCapacity(room);
     if (room.players.length >= maxAllowed) {
-      return { success: false, message: `Maximum player capacity (${maxAllowed}) reached.` };
+      return { success: false, message: `Đã đạt số lượng người chơi tối đa (${maxAllowed} người). Bật thêm bản mở rộng để tăng sức chứa phòng!` };
     }
 
     const botNum = room.players.filter(p => p.isBot).length;
@@ -490,6 +478,20 @@ export class RoomManager {
   public getRoomBySession(sessionId: string): Room | undefined {
     const roomId = this.sessionToRoomMap.get(sessionId);
     return roomId ? this.rooms.get(roomId) : undefined;
+  }
+
+  public getMaxCapacity(room: Room): number {
+    if (room.settings.gameType === 'uno') return 8;
+    if (room.settings.gameType === 'tien-len') return 4;
+    if (room.settings.gameType === 'exploding-kittens') {
+      let max = 5;
+      const exp = room.settings.ekExpansions;
+      if (exp?.implodingKittens) max += 1; // 6 players (official Imploding expansion)
+      if (exp?.streakingKittens) max += 2; // up to 8 players
+      if (exp?.barkingKittens) max += 2;   // up to 10 players
+      return Math.min(10, max);
+    }
+    return 5;
   }
 
   private generateRoomCode(): string {

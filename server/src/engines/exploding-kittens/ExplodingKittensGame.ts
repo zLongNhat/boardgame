@@ -136,6 +136,21 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
         });
       }
     }
+
+    // For larger games (> 5 players), duplicate base cards (Party Pack mechanics) to ensure plenty of cards
+    if (playerCount > 5) {
+      for (const def of BASE_CARD_DEFINITIONS) {
+        for (let i = 0; i < def.count; i++) {
+          generalDeck.push({
+            id: crypto.randomUUID(),
+            type: def.type,
+            name: def.name,
+            description: def.description
+          });
+        }
+      }
+    }
+
     generalDeck = BaseGame.shuffleDeck(generalDeck);
 
     // 2. Deal 1 Defuse and 4 cards to each player (total 5 cards each)
@@ -157,8 +172,8 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
       player.isBlinded = false;
     }
 
-    // 3. Add remaining Defuses (6 - playerCount)
-    const extraDefuses = Math.max(0, 6 - playerCount);
+    // 3. Add remaining Defuses (In >5 players, ensure at least 2 extra defuses in the draw pile)
+    const extraDefuses = playerCount > 5 ? Math.max(2, 10 - playerCount) : Math.max(0, 6 - playerCount);
     for (let i = 0; i < extraDefuses; i++) {
       generalDeck.push({
         id: crypto.randomUUID(),

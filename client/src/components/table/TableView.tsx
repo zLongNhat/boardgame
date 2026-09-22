@@ -91,6 +91,27 @@ export const SEAT_LAYOUTS: Record<number, SeatCoord[]> = {
     { left: '80%', top: '7%', transform: 'translate(-50%, 0)', position: 'top-right' },
     { left: '92%', top: '34%', transform: 'translate(-50%, -50%)', position: 'right' },
     { left: '93%', top: '60%', transform: 'translate(-50%, -50%)', position: 'bottom-right' }
+  ],
+  8: [
+    { left: '7%', top: '60%', transform: 'translate(-50%, -50%)', position: 'bottom-left' },
+    { left: '8%', top: '34%', transform: 'translate(-50%, -50%)', position: 'left' },
+    { left: '16%', top: '13%', transform: 'translate(-50%, -50%)', position: 'top-left' },
+    { left: '38%', top: '2%', transform: 'translate(-50%, 0)', position: 'top' },
+    { left: '62%', top: '2%', transform: 'translate(-50%, 0)', position: 'top' },
+    { left: '84%', top: '13%', transform: 'translate(-50%, -50%)', position: 'top-right' },
+    { left: '92%', top: '34%', transform: 'translate(-50%, -50%)', position: 'right' },
+    { left: '93%', top: '60%', transform: 'translate(-50%, -50%)', position: 'bottom-right' }
+  ],
+  9: [
+    { left: '7%', top: '60%', transform: 'translate(-50%, -50%)', position: 'bottom-left' },
+    { left: '8%', top: '35%', transform: 'translate(-50%, -50%)', position: 'left' },
+    { left: '15%', top: '14%', transform: 'translate(-50%, -50%)', position: 'top-left' },
+    { left: '33%', top: '2%', transform: 'translate(-50%, 0)', position: 'top' },
+    { left: '50%', top: '2%', transform: 'translate(-50%, 0)', position: 'top' },
+    { left: '67%', top: '2%', transform: 'translate(-50%, 0)', position: 'top' },
+    { left: '85%', top: '14%', transform: 'translate(-50%, -50%)', position: 'top-right' },
+    { left: '92%', top: '35%', transform: 'translate(-50%, -50%)', position: 'right' },
+    { left: '93%', top: '60%', transform: 'translate(-50%, -50%)', position: 'bottom-right' }
   ]
 };
 
@@ -499,7 +520,7 @@ export const TableView: React.FC<TableViewProps> = ({
           <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden">
             {otherPlayers.map((opp, idx) => {
               const isTurn = opp.id === currentTurnPlayer?.id;
-              const layoutList = SEAT_LAYOUTS[otherPlayers.length] || SEAT_LAYOUTS[3];
+              const layoutList = SEAT_LAYOUTS[otherPlayers.length] || SEAT_LAYOUTS[Math.min(9, Math.max(1, otherPlayers.length))];
               const coord = layoutList[idx] || layoutList[layoutList.length - 1];
 
               return (

@@ -259,3 +259,41 @@ test('ExplodingKittensGame - Draw from bottom consumes card and cannot be drawn 
   game.clearTurnTimer();
 });
 
+test('ExplodingKittensGame - Multi-player scaling with expansions (up to 10 players)', () => {
+  // Create 10 players
+  const players = Array.from({ length: 10 }, (_, i) => ({
+    id: `player-${i + 1}`,
+    name: `Player ${i + 1}`,
+    avatar: `av-${i + 1}`,
+    isBot: false
+  }));
+
+  const game = new ExplodingKittensGame(players, 30, {
+    implodingKittens: true,
+    streakingKittens: true,
+    barkingKittens: true,
+    timebombMode: false
+  });
+  game.start();
+
+  // All 10 players must have 5 cards (1 Defuse + 4 starter cards)
+  for (let i = 1; i <= 10; i++) {
+    const hand: any[] = (game as any).hands.get(`player-${i}`);
+    assert.strictEqual(hand.length, 5, `Player ${i} must receive 5 cards`);
+    assert.strictEqual(hand.filter(c => c.type === 'defuse').length, 1, `Player ${i} must have 1 Defuse`);
+  }
+
+  // Draw pile should contain extra defuses (Party Pack mechanics) and bombs
+  const drawPile: any[] = (game as any).drawPile;
+  const defusesInPile = drawPile.filter(c => c.type === 'defuse').length;
+  assert.ok(defusesInPile >= 2, 'There should be extra defuses in the deck for 10 players');
+
+  // With Streaking Kittens, bombs = playerCount = 10 Exploding Kittens + 1 Imploding Kitten
+  const explodingCount = drawPile.filter(c => c.type === 'exploding_kitten').length;
+  const implodingCount = drawPile.filter(c => c.type === 'imploding_kitten').length;
+  assert.strictEqual(explodingCount, 10, 'Should have 10 Exploding Kittens for 10 players with Streaking Kittens');
+  assert.strictEqual(implodingCount, 1, 'Should have 1 Imploding Kitten');
+
+  game.clearTurnTimer();
+});
+

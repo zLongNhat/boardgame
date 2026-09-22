@@ -355,12 +355,20 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
 
   // Active Room Lobby View
   const isHost = player.isHost;
-  const maxCapacities: Record<GameType, number> = {
-    'uno': 8,
-    'exploding-kittens': 5,
-    'tien-len': 4
+  const getMaxAllowed = (settings: RoomSettings): number => {
+    if (settings.gameType === 'uno') return 8;
+    if (settings.gameType === 'tien-len') return 4;
+    if (settings.gameType === 'exploding-kittens') {
+      let max = 5;
+      const exp = settings.ekExpansions;
+      if (exp?.implodingKittens) max += 1; // 6 players (official Imploding expansion)
+      if (exp?.streakingKittens) max += 2; // up to 8 players
+      if (exp?.barkingKittens) max += 2;   // up to 10 players
+      return Math.min(10, max);
+    }
+    return 5;
   };
-  const maxAllowed = maxCapacities[room.settings.gameType];
+  const maxAllowed = getMaxAllowed(room.settings);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(room.id);
@@ -737,20 +745,20 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                     {
                       key: 'implodingKittens',
                       title: 'Bản Mở Rộng 1: Imploding Kittens',
-                      desc: 'Mèo Phát Nổ ngửa mặt, Tấn Công Mục Tiêu, Đảo Chiều, Rút Đáy, Mèo Hoang, Sửa Tương Lai 3X.',
-                      badge: '☢️ Imploding'
+                      desc: 'Mèo Phát Nổ ngửa mặt, Tấn Công Mục Tiêu, Đảo Chiều, Rút Đáy, Mèo Hoang, Sửa Tương Lai 3X. Mở rộng thêm 1 người chơi.',
+                      badge: '☢️ Imploding (+1 người: tối đa 6)'
                     },
                     {
                       key: 'streakingKittens',
                       title: 'Bản Mở Rộng 2: Streaking Kittens',
-                      desc: 'Mèo Đi Dạo (ôm bí mật 1 Mèo Nổ, ai trộm nổ tung!), Siêu Bỏ Qua, Bom Nguyên Tử, Lời Nguyền Đít Mèo, Soi 5X.',
-                      badge: '🩲 Streaking'
+                      desc: 'Mèo Đi Dạo (ôm bí mật 1 Mèo Nổ, ai trộm nổ tung!), Siêu Bỏ Qua, Bom Nguyên Tử, Lời Nguyền Đít Mèo, Soi 5X. Thêm 1 Mèo Nổ, mở rộng thêm người chơi.',
+                      badge: '🩲 Streaking (+2 người: tối đa 8)'
                     },
                     {
                       key: 'barkingKittens',
                       title: 'Bản Mở Rộng 3: Barking Kittens',
-                      desc: 'Mèo Sủa (đòi thẻ Gỡ Bom), Tấn Công Bản Thân 3X, Chôn Bài, Cái Đó Của Tôi, Chia Sẻ Tương Lai.',
-                      badge: '🐶 Barking'
+                      desc: 'Mèo Sủa (đòi thẻ Gỡ Bom), Tấn Công Bản Thân 3X, Chôn Bài, Cái Đó Của Tôi, Chia Sẻ Tương Lai. Mở rộng thêm người chơi.',
+                      badge: '🐶 Barking (+2 người: tối đa 10)'
                     },
                     {
                       key: 'timebombMode',
