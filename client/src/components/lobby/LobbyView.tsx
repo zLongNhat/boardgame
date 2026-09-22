@@ -17,7 +17,7 @@ import {
   UserPlus,
   Users
 } from 'lucide-react';
-import { GameType, RoomPlayer, RoomSettings, RoomState, UnoMode } from '../../types/game';
+import { EKExpansions, GameType, RoomPlayer, RoomSettings, RoomState, UnoMode } from '../../types/game';
 import { useAuth } from '../../context/AuthContext';
 import { AuthModal } from '../auth/AuthModal';
 import { LeaderboardView } from '../leaderboard/LeaderboardView';
@@ -681,14 +681,92 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             )}
 
             {room.settings.gameType === 'exploding-kittens' && (
-              <div className="p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-xs text-orange-200 space-y-1">
-                <div className="font-bold flex items-center gap-1.5">
-                  <Flame className="w-4 h-4 text-orange-400" />
-                  Luật Chơi Mèo Nổ (Exploding Kittens)
+              <div className="space-y-4 pt-4 border-t border-slate-800/80">
+                <div className="p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-xs text-orange-200 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <Flame className="w-4 h-4 text-orange-400" />
+                    Cơ Chế Mèo Nổ Cơ Bản
+                  </div>
+                  <p className="text-[11px] text-orange-300/80">
+                    Bao gồm chuỗi phản ứng thẻ Chặn Nope (3 giây) và cửa sổ gỡ bom đưa lại bài vào bộ bài tương tác (10 giây).
+                  </p>
                 </div>
-                <p className="text-[11px] text-orange-300/80">
-                  Bao gồm chuỗi phản ứng thẻ Chặn Nope (3 giây) và cửa sổ gỡ bom đưa lại bài vào bộ bài tương tác (10 giây).
-                </p>
+
+                <div className="space-y-2">
+                  <span className="block text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Bản Mở Rộng &amp; Chế Độ Chơi (Bật / Tắt)
+                  </span>
+
+                  {[
+                    {
+                      key: 'implodingKittens',
+                      title: 'Bản Mở Rộng 1: Imploding Kittens',
+                      desc: 'Mèo Phát Nổ ngửa mặt, Tấn Công Mục Tiêu, Đảo Chiều, Rút Đáy, Mèo Hoang, Sửa Tương Lai 3X.',
+                      badge: '☢️ Imploding'
+                    },
+                    {
+                      key: 'streakingKittens',
+                      title: 'Bản Mở Rộng 2: Streaking Kittens',
+                      desc: 'Mèo Đi Dạo (ôm bí mật 1 Mèo Nổ, ai trộm nổ tung!), Siêu Bỏ Qua, Bom Nguyên Tử, Lời Nguyền Đít Mèo, Soi 5X.',
+                      badge: '🩲 Streaking'
+                    },
+                    {
+                      key: 'barkingKittens',
+                      title: 'Bản Mở Rộng 3: Barking Kittens',
+                      desc: 'Mèo Sủa (đòi thẻ Gỡ Bom), Tấn Công Bản Thân 3X, Chôn Bài, Cái Đó Của Tôi, Chia Sẻ Tương Lai.',
+                      badge: '🐶 Barking'
+                    },
+                    {
+                      key: 'timebombMode',
+                      title: 'Chế Độ Bom Hẹn Giờ (Timebomb - 15s)',
+                      desc: 'Giới hạn thời gian mỗi lượt chỉ 15 giây (thay vì 30s) cực kỳ kịch tính và dồn dập!',
+                      badge: '⏱️ 15s Fast'
+                    }
+                  ].map((exp) => {
+                    const k = exp.key as keyof EKExpansions;
+                    const val = !!room.settings.ekExpansions?.[k];
+                    return (
+                      <label
+                        key={exp.key}
+                        className={`flex items-start justify-between p-3 rounded-2xl border text-xs cursor-pointer transition-all ${
+                          val
+                            ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
+                            : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
+                        } ${!isHost && 'pointer-events-none opacity-80'}`}
+                      >
+                        <div className="space-y-0.5 pr-2">
+                          <div className="font-bold flex items-center gap-2 text-white">
+                            <span>{exp.title}</span>
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                              {exp.badge}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400">{exp.desc}</div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={val}
+                          disabled={!isHost}
+                          onChange={(e) => {
+                            const current = room.settings.ekExpansions || {
+                              implodingKittens: false,
+                              streakingKittens: false,
+                              barkingKittens: false,
+                              timebombMode: false
+                            };
+                            onUpdateSettings({
+                              ekExpansions: {
+                                ...current,
+                                [k]: e.target.checked
+                              }
+                            });
+                          }}
+                          className="mt-1 rounded text-rose-600 focus:ring-0 bg-slate-900 border-slate-700 w-4 h-4 cursor-pointer"
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

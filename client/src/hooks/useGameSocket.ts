@@ -10,6 +10,7 @@ export function useGameSocket() {
   const [player, setPlayer] = useState<RoomPlayer | null>(null);
   const [gameState, setGameState] = useState<AnyMaskedGameState | null>(null);
   const [seeFutureCards, setSeeFutureCards] = useState<EKCard[] | null>(null);
+  const [alterFutureCards, setAlterFutureCards] = useState<EKCard[] | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const sessionIdRef = useRef<string>('');
@@ -89,6 +90,10 @@ export function useGameSocket() {
 
     s.on('ek_see_future', (data: { cards: EKCard[] }) => {
       setSeeFutureCards(data.cards);
+    });
+
+    s.on('ek_alter_future', (data: { cards: EKCard[] }) => {
+      setAlterFutureCards(data.cards);
     });
 
     setSocket(s);
@@ -222,6 +227,7 @@ export function useGameSocket() {
     setPlayer(null);
     setGameState(null);
     setSeeFutureCards(null);
+    setAlterFutureCards(null);
     setErrorMsg(null);
   };
 
@@ -233,6 +239,8 @@ export function useGameSocket() {
     gameState,
     seeFutureCards,
     setSeeFutureCards,
+    alterFutureCards,
+    setAlterFutureCards,
     errorMsg,
     setErrorMsg,
     createRoom,

@@ -34,6 +34,12 @@ export interface RoomSettings {
   unoMode: UnoMode;
   unoRules: UnoRules;
   tienLenFirstTurnRule: boolean;
+  ekExpansions: {
+    implodingKittens: boolean;
+    streakingKittens: boolean;
+    barkingKittens: boolean;
+    timebombMode: boolean;
+  };
 }
 
 export interface Room {
@@ -94,7 +100,13 @@ export class RoomManager {
           mercyLimit: 25,
           drawToMatch: false
         },
-        tienLenFirstTurnRule: true
+        tienLenFirstTurnRule: true,
+        ekExpansions: {
+          implodingKittens: false,
+          streakingKittens: false,
+          barkingKittens: false,
+          timebombMode: false
+        }
       },
       inGame: false,
       gameInstance: null,
@@ -369,7 +381,7 @@ export class RoomManager {
         break;
 
       case 'exploding-kittens':
-        game = new ExplodingKittensGame(enginePlayers, room.settings.turnTimeLimit);
+        game = new ExplodingKittensGame(enginePlayers, room.settings.turnTimeLimit, room.settings.ekExpansions);
         break;
 
       case 'tien-len':

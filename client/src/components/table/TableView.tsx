@@ -22,6 +22,8 @@ interface TableViewProps {
   gameState: AnyMaskedGameState;
   seeFutureCards: EKCard[] | null;
   onCloseSeeFuture: () => void;
+  alterFutureCards?: EKCard[] | null;
+  onCloseAlterFuture?: () => void;
   onSendAction: (action: any) => void;
   onRestartGame: () => void;
   onLeaveRoom: () => void;
@@ -109,6 +111,8 @@ export const TableView: React.FC<TableViewProps> = ({
   gameState,
   seeFutureCards,
   onCloseSeeFuture,
+  alterFutureCards,
+  onCloseAlterFuture,
   onSendAction,
   onRestartGame,
   onLeaveRoom,
@@ -621,6 +625,8 @@ export const TableView: React.FC<TableViewProps> = ({
                 myPlayerId={player.id}
                 seeFutureCards={seeFutureCards}
                 onCloseSeeFuture={onCloseSeeFuture}
+                alterFutureCards={alterFutureCards}
+                onCloseAlterFuture={onCloseAlterFuture || (() => {})}
                 onSendAction={onSendAction}
               />
             )}

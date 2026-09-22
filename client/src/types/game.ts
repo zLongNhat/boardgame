@@ -39,6 +39,13 @@ export interface ChatMessage {
   isSystem?: boolean;
 }
 
+export interface EKExpansions {
+  implodingKittens: boolean;
+  streakingKittens: boolean;
+  barkingKittens: boolean;
+  timebombMode: boolean;
+}
+
 export interface RoomSettings {
   gameType: GameType;
   turnTimeLimit: number;
@@ -52,6 +59,7 @@ export interface RoomSettings {
     drawToMatch: boolean;
   };
   tienLenFirstTurnRule: boolean;
+  ekExpansions: EKExpansions;
 }
 
 export interface RoomState {
@@ -133,13 +141,36 @@ export type EKCardType =
   | 'hairy_potato_cat'
   | 'rainbow_ralphing_cat'
   | 'beard_cat'
-  | 'cattermelon';
+  | 'cattermelon'
+  // Imploding Kittens
+  | 'imploding_kitten'
+  | 'targeted_attack'
+  | 'reverse'
+  | 'draw_from_bottom'
+  | 'feral_cat'
+  | 'alter_the_future_3x'
+  // Streaking Kittens
+  | 'streaking_kitten'
+  | 'super_skip'
+  | 'see_the_future_5x'
+  | 'alter_the_future_5x'
+  | 'swap_top_and_bottom'
+  | 'catomic_bomb'
+  | 'garbage_collection'
+  | 'curse_of_cat_butt'
+  // Barking Kittens
+  | 'barking_kitten'
+  | 'personal_attack'
+  | 'bury'
+  | 'ill_take_that'
+  | 'share_the_future';
 
 export interface EKCard {
   id: string;
   type: EKCardType;
   name: string;
   description: string;
+  isFaceUp?: boolean;
 }
 
 export interface MaskedEKPlayer {
@@ -193,6 +224,10 @@ export interface MaskedEKGameState {
   pendingDefusal: PendingDefusal | null;
   pendingFavor: PendingFavor | null;
   logs: GameLogEntry[];
+  topDrawCardIsFaceUp?: boolean;
+  topDrawCardName?: string;
+  ekExpansions?: EKExpansions;
+  curseActive?: boolean;
 }
 
 // Tiến Lên

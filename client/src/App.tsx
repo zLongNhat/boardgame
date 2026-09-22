@@ -12,6 +12,8 @@ const GameContent: React.FC = () => {
     gameState,
     seeFutureCards,
     setSeeFutureCards,
+    alterFutureCards,
+    setAlterFutureCards,
     errorMsg,
     createRoom,
     joinRoom,
@@ -45,6 +47,8 @@ const GameContent: React.FC = () => {
         gameState={gameState}
         seeFutureCards={seeFutureCards}
         onCloseSeeFuture={() => setSeeFutureCards(null)}
+        alterFutureCards={alterFutureCards}
+        onCloseAlterFuture={() => setAlterFutureCards(null)}
         onSendAction={sendAction}
         onRestartGame={restartGame}
         onLeaveRoom={leaveRoom}
