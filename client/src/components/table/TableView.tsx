@@ -7,6 +7,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { AnyMaskedGameState, EKCard, GameType, RoomPlayer, RoomState } from '../../types/game';
+import { useLang } from '../../i18n/LanguageContext';
 import { sounds } from '../../utils/sound';
 import { ExplodingKittensTableView } from '../exploding-kittens/ExplodingKittensTableView';
 import { EKCardView } from '../exploding-kittens/EKCardView';
@@ -139,6 +140,7 @@ export const TableView: React.FC<TableViewProps> = ({
   onLeaveRoom,
   onSendMessage
 }) => {
+  const { t } = useLang();
   const [showChat, setShowChat] = useState<boolean>(false);
   const [chatText, setChatText] = useState<string>('');
   const [timeLeft, setTimeLeft] = useState<number>(gameState.turnTimeLimit);
@@ -441,7 +443,7 @@ export const TableView: React.FC<TableViewProps> = ({
             {isUno ? 'UNO' : gameState.gameType === 'exploding-kittens' ? 'MÈO NỔ' : 'TIẾN LÊN'}
           </div>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-900 text-slate-300 font-bold border border-slate-700">
-            Phòng {room.id}
+            {t('tb.room')} {room.id}
           </span>
         </div>
 
@@ -456,7 +458,7 @@ export const TableView: React.FC<TableViewProps> = ({
           <button
             onClick={() => setShowChat(!showChat)}
             className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 transition-colors"
-            title="Trò chuyện & Nhật ký"
+            title={t('tb.chatLog')}
           >
             <MessageSquare className="w-4 h-4" />
           </button>
@@ -465,7 +467,7 @@ export const TableView: React.FC<TableViewProps> = ({
             <button
               onClick={onRestartGame}
               className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 transition-colors"
-              title="Về lại phòng chờ"
+              title={t('tb.backToLobby')}
             >
               <RotateCcw className="w-4 h-4" />
             </button>
@@ -474,7 +476,7 @@ export const TableView: React.FC<TableViewProps> = ({
           <button
             onClick={onLeaveRoom}
             className="p-2 rounded-xl bg-slate-900 hover:bg-rose-500/20 hover:text-rose-300 text-slate-300 transition-colors"
-            title="Rời khỏi trận đấu"
+            title={t('tb.leaveMatch')}
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -774,12 +776,12 @@ export const TableView: React.FC<TableViewProps> = ({
               type="text"
               value={chatText}
               onChange={(e) => setChatText(e.target.value)}
-              placeholder="Nhập tin nhắn..."
+              placeholder={t('tb.chatPh')}
               maxLength={80}
               className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             />
             <button type="submit" className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold">
-              Gửi
+              {t('tb.send')}
             </button>
           </form>
         </div>

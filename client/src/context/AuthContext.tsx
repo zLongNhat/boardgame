@@ -5,7 +5,7 @@ interface AuthContextType {
   user: PublicUser | null;
   token: string | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (username: string, password: string, remember?: boolean) => Promise<{ success: boolean; message?: string }>;
   register: (
     username: string,
     password: string,
@@ -16,11 +16,35 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
 }
 
+const TOKEN_KEY = 'omnideck_token';
+const USER_KEY = 'omnideck_user';
+
+/** Token nhớ lâu (localStorage) trước, phiên tạm (sessionStorage) sau. */
+const getStoredToken = (): string | null =>
+  localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+
+const storeAuth = (token: string, user: PublicUser, remember: boolean) => {
+  // Ghi nhớ: giữ qua lần mở trình duyệt sau; không thì chỉ trong tab hiện tại
+  const persistent = remember ? localStorage : sessionStorage;
+  const other = remember ? sessionStorage : localStorage;
+  other.removeItem(TOKEN_KEY);
+  other.removeItem(USER_KEY);
+  persistent.setItem(TOKEN_KEY, token);
+  persistent.setItem(USER_KEY, JSON.stringify(user));
+};
+
+const clearAuth = () => {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
+};
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<PublicUser | null>(() => {
-    const saved = localStorage.getItem('omnideck_user');
+    const saved = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -30,12 +54,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return null;
   });
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('omnideck_token'));
+  const [token, setToken] = useState<string | null>(() => getStoredToken());
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Fetch updated profile on mount if token is present
   const refreshUser = async () => {
-    const currentToken = localStorage.getItem('omnideck_token');
+    const currentToken = getStoredToken();
     if (!currentToken) {
       setUser(null);
       setIsLoading(false);
@@ -51,13 +75,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const data = await res.json();
       if (res.ok && data.success && data.user) {
         setUser(data.user);
-        localStorage.setItem('omnideck_user', JSON.stringify(data.user));
+        (localStorage.getItem(TOKEN_KEY) ? localStorage : sessionStorage).setItem(USER_KEY, JSON.stringify(data.user));
       } else {
         // Token expired or invalid
         setUser(null);
         setToken(null);
-        localStorage.removeItem('omnideck_token');
-        localStorage.removeItem('omnideck_user');
+        clearAuth();
       }
     } catch (err) {
       console.warn('[Auth] Failed to verify current user session:', err);
@@ -70,19 +93,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser();
   }, []);
 
-  const login = async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
+  const login = async (username: string, password: string, remember: boolean = true): Promise<{ success: boolean; message?: string }> => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password, remember })
       });
       const data = await res.json();
       if (res.ok && data.success) {
         setToken(data.token);
         setUser(data.user);
-        localStorage.setItem('omnideck_token', data.token);
-        localStorage.setItem('omnideck_user', JSON.stringify(data.user));
+        storeAuth(data.token, data.user, remember);
         return { success: true };
       }
       return { success: false, message: data.message || 'Đăng nhập không thành công.' };
@@ -107,8 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res.ok && data.success) {
         setToken(data.token);
         setUser(data.user);
-        localStorage.setItem('omnideck_token', data.token);
-        localStorage.setItem('omnideck_user', JSON.stringify(data.user));
+        storeAuth(data.token, data.user, true);
         return { success: true };
       }
       return { success: false, message: data.message || 'Đăng ký tài khoản không thành công.' };
@@ -118,10 +139,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    const currentToken = getStoredToken();
+    if (currentToken) {
+      // Thu hồi token phía server, khỏi chờ
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${currentToken}` }
+      }).catch(() => {});
+    }
     setUser(null);
     setToken(null);
-    localStorage.removeItem('omnideck_token');
-    localStorage.removeItem('omnideck_user');
+    clearAuth();
   };
 
   return (

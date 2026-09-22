@@ -1,87 +1,69 @@
 import React from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import { LobbyView } from './components/lobby/LobbyView';
-import { TableView } from './components/table/TableView';
-import { useGameSocket } from './hooks/useGameSocket';
+import { GameSocketProvider } from './hooks/GameSocketContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { LanguageProvider } from './i18n/LanguageContext';
+import { AppShell } from './components/layout/AppShell';
+import { DashboardPage } from './pages/DashboardPage';
+import { PlayPage } from './pages/PlayPage';
+import { RoomPage } from './pages/RoomPage';
+import { HustlePage } from './pages/HustlePage';
+import { LeaderboardPage } from './pages/LeaderboardPage';
+import { TaiXiuPage } from './pages/TaiXiuPage';
+import { MinesPage } from './pages/MinesPage';
+import { GoalsPage } from './pages/GoalsPage';
+import { RoulettePage, AviatorPage, ChickenPage, HiloPage, CoinflipPage, RpsPage } from './pages/CasinoPages';
 
-const GameContent: React.FC = () => {
-  const {
-    connected,
-    room,
-    player,
-    gameState,
-    seeFutureCards,
-    setSeeFutureCards,
-    alterFutureCards,
-    setAlterFutureCards,
-    errorMsg,
-    createRoom,
-    joinRoom,
-    addBot,
-    removeBot,
-    updateSettings,
-    setReady,
-    startGame,
-    restartGame,
-    sendAction,
-    sendChatMessage,
-    leaveRoom
-  } = useGameSocket();
-
-  // If in game:
-  if (room && room.inGame) {
-    // If gameState or player is still synchronizing from server, display loading spinner instead of falling back to lobby
-    if (!gameState || !player) {
-      return (
-        <div className="w-full h-screen bg-slate-950 flex flex-col items-center justify-center text-white gap-4 font-sans">
-          <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xl font-bold tracking-wide animate-pulse">Đang tải ván chơi...</p>
-        </div>
-      );
-    }
-
-    return (
-      <TableView
-        room={room}
-        player={player}
-        gameState={gameState}
-        seeFutureCards={seeFutureCards}
-        onCloseSeeFuture={() => setSeeFutureCards(null)}
-        alterFutureCards={alterFutureCards}
-        onCloseAlterFuture={() => setAlterFutureCards(null)}
-        onSendAction={sendAction}
-        onRestartGame={restartGame}
-        onLeaveRoom={leaveRoom}
-        onSendMessage={sendChatMessage}
-      />
-    );
-  }
-
-  // Otherwise render LobbyView (Join/Create or Room Lobby)
-  return (
-    <LobbyView
-      room={room}
-      player={player}
-      connected={connected}
-      onCreateRoom={createRoom}
-      onJoinRoom={joinRoom}
-      onAddBot={addBot}
-      onRemoveBot={removeBot}
-      onUpdateSettings={updateSettings}
-      onSetReady={setReady}
-      onStartGame={startGame}
-      onLeaveRoom={leaveRoom}
-      onSendMessage={sendChatMessage}
-      errorMsg={errorMsg}
-    />
-  );
-};
-
+/**
+ * OmniDeck Arena — URL Router.
+ * - /dashboard ......... Navigation Panel (trung tâm mọi dịch vụ)
+ * - /play .............. Vào Phòng Đấu (tạo/vào phòng cược)
+ * - /room/:roomId ...... Phòng chờ + bàn đấu (mã phòng)
+ * - /room?id=XXX ....... Deep-link phòng (query)
+ * - /room-id?id=XXX .... Alias đúng yêu cầu /room-id=?
+ * - /hustle ............ Đi Làm kiếm coins
+ * - /leaderboard ....... Bảng xếp hạng
+ * - /tai-xiu /mines /goals ... Casino minh bạch
+ */
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <GameContent />
+    <ErrorBoundary>
+      <LanguageProvider>
+      <AuthProvider>
+        <GameSocketProvider>
+          <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route element={<AppShell />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/play" element={<PlayPage />} />
+              <Route path="/room" element={<RoomPage />} />
+              <Route path="/room/:roomId" element={<RoomPage />} />
+              <Route path="/room-id" element={<RoomPage />} />
+              <Route path="/hustle" element={<HustlePage />} />
+              <Route path="/leaderboard" element={<LeaderboardPage />} />
+              {/* Giữ tương thích điều hướng cũ */}
+              <Route path="/lobby" element={<Navigate to="/play" replace />} />
+              <Route path="/work" element={<Navigate to="/hustle" replace />} />
+              {/* Arena trong cùng khung Navigation Panel để tab sáng đúng */}
+              <Route path="/tai-xiu" element={<TaiXiuPage />} />
+              <Route path="/mines" element={<MinesPage />} />
+              <Route path="/goals" element={<GoalsPage />} />
+              <Route path="/roulette" element={<RoulettePage />} />
+              <Route path="/aviator" element={<AviatorPage />} />
+              <Route path="/chicken" element={<ChickenPage />} />
+              <Route path="/hilo" element={<HiloPage />} />
+              <Route path="/coinflip" element={<CoinflipPage />} />
+              <Route path="/rps" element={<RpsPage />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </GameSocketProvider>
     </AuthProvider>
+      </LanguageProvider>
+  </ErrorBoundary>
   );
 };
 

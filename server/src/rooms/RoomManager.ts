@@ -41,6 +41,17 @@ export interface RoomSettings {
     barkingKittens: boolean;
     timebombMode: boolean;
   };
+  betAmount: number;
+}
+
+export const MIN_ROOM_BET = 10;
+export const MAX_ROOM_BET = 5000;
+export const DEFAULT_ROOM_BET = 50;
+
+export function sanitizeRoomBet(raw: unknown): number {
+  const amt = Math.floor(Number(raw));
+  if (Number.isNaN(amt)) return DEFAULT_ROOM_BET;
+  return Math.min(MAX_ROOM_BET, Math.max(MIN_ROOM_BET, amt));
 }
 
 export interface Room {
@@ -68,7 +79,7 @@ export class RoomManager {
   private rooms: Map<string, Room> = new Map();
   private sessionToRoomMap: Map<string, string> = new Map();
 
-  public createRoom(hostSessionId: string, hostName: string, hostAvatar: string, socketId: string, userId?: string): Room {
+  public createRoom(hostSessionId: string, hostName: string, hostAvatar: string, socketId: string, userId?: string, betAmount?: number): Room {
     const roomId = this.generateRoomCode();
     const hostId = crypto.randomUUID();
 
@@ -108,7 +119,9 @@ export class RoomManager {
           streakingKittens: false,
           barkingKittens: false,
           timebombMode: false
-        }
+        },
+        // Phòng luôn tính phí: cược tối thiểu MIN_ROOM_BET, mặc định DEFAULT_ROOM_BET
+        betAmount: sanitizeRoomBet(betAmount)
       },
       inGame: false,
       gameInstance: null,
@@ -288,6 +301,14 @@ export class RoomManager {
     if (room.hostId !== requesterId) return { success: false, message: 'Only host can change room settings.' };
     if (room.inGame) return { success: false, message: 'Cannot change settings during a match.' };
 
+    if (newSettings.betAmount !== undefined) {
+      const amt = Math.floor(Number(newSettings.betAmount));
+      if (Number.isNaN(amt) || amt < MIN_ROOM_BET || amt > MAX_ROOM_BET) {
+        return { success: false, message: `Mức cược phòng từ ${MIN_ROOM_BET} đến ${MAX_ROOM_BET} 🪙 (phòng luôn tính phí).` };
+      }
+      newSettings.betAmount = amt;
+    }
+
     room.settings = {
       ...room.settings,
       ...newSettings,
@@ -326,6 +347,12 @@ export class RoomManager {
     if (!room) return { success: false, message: 'Room not found.' };
     if (room.hostId !== requesterId) return { success: false, message: 'Only host can start the game.' };
     if (room.inGame) return { success: false, message: 'Game is already running.' };
+
+    // Phòng luôn tính phí — chặn ván free (phòng cũ tạo trước khi đổi luật)
+    const roomBet = Math.floor(Number(room.settings?.betAmount || 0));
+    if (roomBet < MIN_ROOM_BET) {
+      return { success: false, message: `Phòng cần đặt mức cược từ ${MIN_ROOM_BET} 🪙 trở lên.` };
+    }
 
     const count = room.players.length;
     if (count < 2) {

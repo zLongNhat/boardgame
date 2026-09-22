@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Flame, RefreshCw, Sparkles, Trophy, Users } from 'lucide-react';
 import { PublicUser } from '../../types/game';
 import { useAuth } from '../../context/AuthContext';
+import { useLang } from '../../i18n/LanguageContext';
 
 type LeaderboardTab = 'all' | 'uno' | 'exploding-kittens' | 'tien-len';
 
@@ -22,6 +23,7 @@ const AVATAR_MAP: Record<string, string> = {
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => {
   const { user } = useAuth();
+  const { t } = useLang();
   const [activeTab, setActiveTab] = useState<LeaderboardTab>('all');
   const [leaderboard, setLeaderboard] = useState<PublicUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -90,13 +92,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => 
   const getTabLabel = (tab: LeaderboardTab) => {
     switch (tab) {
       case 'uno':
-        return 'Thắng UNO';
+        return t('lb.unoWinsCol');
       case 'exploding-kittens':
-        return 'Thắng Mèo Nổ';
+        return t('lb.ekWinsCol');
       case 'tien-len':
-        return 'Thắng Tiến Lên';
+        return t('lb.tlWinsCol');
       default:
-        return 'Tổng Thắng';
+        return t('lb.totalWinsCol');
     }
   };
 
@@ -111,14 +113,14 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => 
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                BẢNG XẾP HẠNG CAO THỦ
+                {t('lb.title')}
               </h2>
               <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-extrabold text-amber-300 uppercase tracking-wider">
-                Mùa Giải 1
+                {t('lb.season')}
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Vinh danh số trận thắng từng trò chơi trên sàn đấu OmniDeck
+              {t('lb.subtitle')}
             </p>
           </div>
         </div>
@@ -131,14 +133,14 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => 
             title="Làm mới bảng xếp hạng"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Cập nhật</span>
+            <span className="hidden sm:inline">{t('lb.refresh')}</span>
           </button>
           {onClose && (
             <button
               onClick={onClose}
               className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold transition-all"
             >
-              Đóng
+              {t('c.close')}
             </button>
           )}
         </div>
@@ -147,10 +149,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => 
       {/* Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6 bg-slate-950/70 p-1.5 rounded-2xl border border-slate-800/80">
         {[
-          { id: 'all', label: '🌟 Tất Cả (Tổng)', color: 'text-amber-400' },
-          { id: 'uno', label: '🔴 UNO', color: 'text-rose-400' },
-          { id: 'exploding-kittens', label: '💣 Mèo Nổ', color: 'text-orange-400' },
-          { id: 'tien-len', label: '🎴 Tiến Lên', color: 'text-emerald-400' }
+          { id: 'all', label: t('lb.tabAll') },
+          { id: 'uno', label: t('lb.tabUno') },
+          { id: 'exploding-kittens', label: t('lb.tabEk') },
+          { id: 'tien-len', label: t('lb.tabTl') }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -171,13 +173,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => 
         {loading && leaderboard.length === 0 ? (
           <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-3">
             <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs font-semibold">Đang tải bảng xếp hạng...</p>
+            <p className="text-xs font-semibold">{t('lb.loading')}</p>
           </div>
         ) : leaderboard.length === 0 ? (
           <div className="py-16 text-center text-slate-500 bg-slate-950/30 rounded-2xl border border-slate-800/50">
             <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm font-bold text-slate-400">Chưa có dữ liệu thi đấu</p>
-            <p className="text-xs text-slate-500 mt-1">Hãy bắt đầu trận đấu đầu tiên để ghi danh!</p>
+            <p className="text-sm font-bold text-slate-400">{t('lb.empty')}</p>
+            <p className="text-xs text-slate-500 mt-1">{t('lb.emptySub')}</p>
           </div>
         ) : (
           leaderboard.map((playerItem, index) => {
@@ -218,16 +220,16 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => 
                       </span>
                       {isMe && (
                         <span className="px-2 py-0.5 rounded-full bg-indigo-500 text-[10px] font-black text-white uppercase tracking-wider shadow">
-                          BẠN
+                          {t('lb.you')}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-slate-400">
                       <span>@{playerItem.username}</span>
                       <span>•</span>
-                      <span className="text-slate-400">{playerItem.stats.totalGames} trận</span>
+                      <span className="text-slate-400">{playerItem.stats.totalGames} {t('lb.matches')}</span>
                       <span>•</span>
-                      <span className="text-emerald-400 font-semibold">{winRate}% thắng</span>
+                      <span className="text-emerald-400 font-semibold">{winRate}% {t('lb.winRate')}</span>
                     </div>
                   </div>
                 </div>
@@ -268,10 +270,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => 
       <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
         <div className="flex items-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span>Điểm thắng được ghi tự động sau mỗi ván đấu kết thúc.</span>
+          <span>{t('lb.footer')}</span>
         </div>
         <div className="text-slate-500 font-mono text-[11px]">
-          {leaderboard.length} người chơi trên bảng vàng
+          {leaderboard.length} {t('lb.playersOnBoard')}
         </div>
       </div>
     </div>

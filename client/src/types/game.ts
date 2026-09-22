@@ -1,4 +1,18 @@
 export type GameType = 'uno' | 'exploding-kittens' | 'tien-len';
+export type SoloGameType = 'tai-xiu' | 'mines' | 'goals';
+export type AppView =
+  | 'dashboard'
+  | 'navigation-panel'
+  | 'lobby'
+  | 'play'
+  | 'room'
+  | 'game'
+  | 'work'
+  | 'hustle'
+  | 'leaderboard'
+  | 'tai-xiu'
+  | 'mines'
+  | 'goals';
 export type UnoMode = 'classic' | 'no-mercy' | 'flex';
 export type UnoColor = 'red' | 'blue' | 'green' | 'yellow' | 'wild';
 
@@ -15,6 +29,7 @@ export interface PublicUser {
   username: string;
   displayName: string;
   avatar: string;
+  balance: number;
   stats: UserStats;
 }
 
@@ -61,6 +76,7 @@ export interface RoomSettings {
   tienLenFirstTurnRule: boolean;
   tienLenCutTwoRule: boolean;
   ekExpansions: EKExpansions;
+  betAmount: number;
 }
 
 export interface RoomState {
@@ -288,3 +304,151 @@ export interface MaskedTLGameState {
 }
 
 export type AnyMaskedGameState = MaskedUnoGameState | MaskedEKGameState | MaskedTLGameState;
+
+// ========== CURRENCY & TRANSACTIONS ==========
+
+export interface Transaction {
+  id: string;
+  userId: string;
+  amount: number;
+  type: 'work' | 'bet' | 'win' | 'room_bet' | 'room_win' | 'signup_bonus';
+  details: string;
+  timestamp: number;
+  balanceAfter: number;
+}
+
+// ========== WORK SYSTEM ==========
+
+export interface WorkChallenge {
+  word: string;
+  expiresAt: number;
+}
+
+export interface WorkResult {
+  success: boolean;
+  earned?: number;
+  newBalance?: number;
+  message?: string;
+  nextAvailableAt?: number;
+}
+
+// ========== TÀI XỈU (DICE) ==========
+
+export type TaiXiuPhase = 'betting' | 'shaking' | 'revealing' | 'settling';
+/** Chỉ còn 2 cửa cược Tài / Xỉu (đã xóa cửa Bão). */
+export type TaiXiuBetType = 'tai' | 'xiu';
+
+/** Tỉ lệ trả thưởng: cược 1 ăn 1.95, 0.05 mỗi cược vào hũ jackpot (nổ khi bão 1-1-1 / 6-6-6). */
+export const TAIXIU_PAYOUT_RATE = 1.95;
+
+export interface TaiXiuDice {
+  d1: number;
+  d2: number;
+  d3: number;
+  total: number;
+}
+
+export interface TaiXiuBet {
+  userId: string;
+  displayName: string;
+  betType: TaiXiuBetType;
+  amount: number;
+}
+
+export interface TaiXiuJackpotWin {
+  roundId: string;
+  dice: TaiXiuDice;
+  side: 'tai' | 'xiu';
+  sharedPool: number;
+  winnerCount: number;
+  shareEach: number;
+  timestamp: number;
+}
+
+export interface TaiXiuRoundResult {
+  roundId: string;
+  dice: TaiXiuDice;
+  result: 'tai' | 'xiu' | 'bao';
+  md5Hash: string;
+  rawString: string;
+  timestamp: number;
+  jackpotShared?: number;
+}
+
+export interface TaiXiuState {
+  phase: TaiXiuPhase;
+  roundId: string;
+  md5Hash: string;
+  phaseEndsAt: number;
+  bets: TaiXiuBet[];
+  currentBets?: TaiXiuBet[];
+  myBets?: TaiXiuBet[];
+  totalTai: number;
+  totalXiu: number;
+  totalBao: number;
+  dice?: TaiXiuDice;
+  result?: 'tai' | 'xiu' | 'bao';
+  rawString?: string;
+  history: TaiXiuRoundResult[];
+  onlineCount: number;
+  jackpotPool?: number;
+  lastJackpot?: TaiXiuJackpotWin | null;
+}
+
+// ========== MINES ==========
+
+export type MinesTileState = 'hidden' | 'star' | 'mine';
+
+export interface MinesGameState {
+  gameId: string;
+  seedHash: string;
+  mineCount: number;
+  betAmount: number;
+  grid: MinesTileState[];
+  revealedCount: number;
+  currentMultiplier: number;
+  currentPayout: number;
+  nextMultiplier: number;
+  isGameOver: boolean;
+  isWin: boolean;
+  serverSeed?: string;
+  clientSeed?: string;
+  nonce?: number;
+}
+
+export interface MinesMultiplierTable {
+  mineCount: number;
+  multipliers: number[];
+}
+
+// ========== GOALS ==========
+
+export type GoalsFieldSize = 'small' | 'medium' | 'big';
+export type GoalsTileState = 'hidden' | 'safe' | 'bomb';
+
+export interface GoalsGameState {
+  gameId: string;
+  seedHash: string;
+  fieldSize: GoalsFieldSize;
+  rows: number;
+  columns: number;
+  betAmount: number;
+  grid: GoalsTileState[][];
+  currentColumn: number;
+  currentMultiplier: number;
+  currentPayout: number;
+  nextMultiplier: number;
+  isGameOver: boolean;
+  isWin: boolean;
+  serverSeed?: string;
+  clientSeed?: string;
+  nonce?: number;
+}
+
+// ========== ROOM BETTING ==========
+
+export interface RoomBetInfo {
+  betAmount: number;
+  potTotal: number;
+  winMultiplier: number;
+}

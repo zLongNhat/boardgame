@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertCircle, CheckCircle, Lock, LogIn, Sparkles, UserPlus, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLang } from '../../i18n/LanguageContext';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'login'
 }) => {
   const { login, register } = useAuth();
+  const { t } = useLang();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
 
   // Form states
@@ -35,6 +37,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [avatar, setAvatar] = useState(AVATARS[0].id);
+  const [remember, setRemember] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,39 +52,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     if (mode === 'login') {
       if (!username.trim() || !password) {
-        setError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
+        setError(t('auth.required'));
         return;
       }
 
       setLoading(true);
-      const res = await login(username.trim(), password);
+      const res = await login(username.trim(), password, remember);
       setLoading(false);
 
       if (res.success) {
-        setSuccessMsg('Đăng nhập thành công! Chào mừng bạn quay lại.');
+        setSuccessMsg(t('auth.loginOk'));
         setTimeout(() => {
           onSuccess?.();
           onClose();
         }, 800);
       } else {
-        setError(res.message || 'Tên đăng nhập hoặc mật khẩu không đúng.');
+        setError(res.message || t('auth.loginFail'));
       }
     } else {
       // Register validation
       if (!username.trim() || !password || !displayName.trim()) {
-        setError('Vui lòng điền đầy đủ tất cả các trường.');
+        setError(t('auth.allFields'));
         return;
       }
       if (username.trim().length < 3) {
-        setError('Tên đăng nhập cần ít nhất 3 ký tự.');
+        setError(t('auth.userShort'));
         return;
       }
       if (password.length < 6) {
-        setError('Mật khẩu cần ít nhất 6 ký tự.');
+        setError(t('auth.passShort'));
         return;
       }
       if (password !== confirmPassword) {
-        setError('Mật khẩu xác nhận không trùng khớp.');
+        setError(t('auth.passMismatch'));
         return;
       }
 
@@ -90,13 +93,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setLoading(false);
 
       if (res.success) {
-        setSuccessMsg('Đăng ký tài khoản thành công!');
+        setSuccessMsg(t('auth.registerOk'));
         setTimeout(() => {
           onSuccess?.();
           onClose();
         }, 800);
       } else {
-        setError(res.message || 'Đăng ký thất bại. Tên đăng nhập có thể đã tồn tại.');
+        setError(res.message || t('auth.registerFail'));
       }
     }
   };
@@ -120,12 +123,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             Tài Khoản Cao Thủ OmniDeck
           </div>
           <h2 className="text-2xl font-black text-white">
-            {mode === 'login' ? 'Đăng Nhập Tài Khoản' : 'Tạo Tài Khoản Mới'}
+            {mode === 'login' ? t('auth.loginTitle') : t('auth.registerTitle')}
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            {mode === 'login'
-              ? 'Lưu giữ số trận thắng và thứ hạng trên Bảng Xếp Hạng'
-              : 'Ghi danh tranh tài bảng xếp hạng cùng hàng ngàn cao thủ'}
+            {mode === 'login' ? t('auth.loginSub') : t('auth.registerSub')}
           </p>
         </div>
 
@@ -144,7 +145,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <LogIn className="w-3.5 h-3.5" />
-            Đăng Nhập
+            {t('auth.loginTab')}
           </button>
           <button
             type="button"
@@ -159,7 +160,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <UserPlus className="w-3.5 h-3.5" />
-            Đăng Ký
+            {t('auth.registerTab')}
           </button>
         </div>
 
@@ -181,13 +182,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-              Tên đăng nhập
+              {t('auth.username')}
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="VD: minh_pro123"
+              placeholder={t('auth.usernamePh')}
               className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
               autoComplete="username"
               required
@@ -197,13 +198,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {mode === 'register' && (
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Biệt danh hiển thị trong game
+                {t('auth.displayName')}
               </label>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="VD: 👑 Minh Thần Bài"
+                placeholder={t('auth.displayPh')}
                 maxLength={20}
                 className="w-full bg-slate-950/80 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
                 required
@@ -213,7 +214,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-              Mật khẩu
+              {t('auth.password')}
             </label>
             <div className="relative">
               <input
@@ -232,7 +233,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {mode === 'register' && (
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Xác nhận mật khẩu
+                {t('auth.confirm')}
               </label>
               <div className="relative">
                 <input
@@ -252,7 +253,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {mode === 'register' && (
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Chọn Avatar Đại Diện
+                {t('auth.avatarPick')}
               </label>
               <div className="grid grid-cols-4 gap-2">
                 {AVATARS.map((av) => (
@@ -274,6 +275,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
+          {mode === 'login' && (
+            <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="w-4 h-4 rounded accent-indigo-500 cursor-pointer"
+              />
+              <span className="text-xs font-semibold text-slate-300">{t('auth.remember')}</span>
+            </label>
+          )}
+
           <button
             type="submit"
             disabled={loading}
@@ -284,12 +297,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             ) : mode === 'login' ? (
               <>
                 <LogIn className="w-4 h-4" />
-                Đăng Nhập Ngay
+                {t('auth.loginBtn')}
               </>
             ) : (
               <>
                 <UserPlus className="w-4 h-4" />
-                Đăng Ký Tài Khoản
+                {t('auth.registerBtn')}
               </>
             )}
           </button>
@@ -301,7 +314,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             onClick={onClose}
             className="text-xs text-slate-400 hover:text-slate-300 underline underline-offset-4 transition-colors"
           >
-            Tiếp tục chơi với tư cách Khách
+            {t('auth.guest')}
           </button>
         </div>
       </div>

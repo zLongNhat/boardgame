@@ -3,5 +3,5 @@ dist/
 *.log
 .DS_Store
 
-# Local user data (reseeded on server start)
-data/users.json
+# Runtime game state (reseeded/reset on server start)
+data/*.json

@@ -103,14 +103,15 @@ export function useGameSocket() {
     };
   }, []);
 
-  const createRoom = (playerName: string, avatar: string, userId?: string) => {
+  const createRoom = (playerName: string, avatar: string, userId?: string, betAmount?: number) => {
     if (!socket) return;
     setErrorMsg(null);
     socket.emit('create_room', {
       sessionId: sessionIdRef.current,
       playerName,
       avatar,
-      userId
+      userId,
+      betAmount
     }, (res: any) => {
       if (res.success) {
         setRoom(res.room);

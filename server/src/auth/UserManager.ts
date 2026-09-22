@@ -18,6 +18,7 @@ export interface User {
   salt: string;
   avatar: string;
   createdAt: number;
+  balance: number;
   stats: UserStats;
 }
 
@@ -26,19 +27,26 @@ export interface PublicUser {
   username: string;
   displayName: string;
   avatar: string;
+  balance: number;
   stats: UserStats;
 }
 
 export class UserManager {
   private dataFilePath: string;
+  private sessionsFilePath: string;
   private users: Map<string, User> = new Map(); // id -> User
   private usernameIndex: Map<string, string> = new Map(); // lowercase username -> id
-  private tokenToUserIdMap: Map<string, string> = new Map(); // token -> id
+  private tokenToUserIdMap: Map<string, { userId: string; expiresAt: number }> = new Map(); // token -> session
+  // Ghi nhớ đăng nhập 30 ngày; không ghi nhớ 24 giờ
+  private readonly REMEMBER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+  private readonly SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
   constructor(customPath?: string) {
     this.dataFilePath = customPath || path.resolve(__dirname, '../../../data/users.json');
+    this.sessionsFilePath = path.resolve(path.dirname(this.dataFilePath), 'sessions.json');
     this.ensureDataDir();
     this.loadUsers();
+    this.loadSessions();
   }
 
   private ensureDataDir() {
@@ -70,6 +78,40 @@ export class UserManager {
     }
   }
 
+  private loadSessions() {
+    // Session lưu file nên restart server / mở lại trình duyệt vẫn còn đăng nhập
+    try {
+      if (!fs.existsSync(this.sessionsFilePath)) return;
+      const raw = fs.readFileSync(this.sessionsFilePath, 'utf-8');
+      const data: Record<string, { userId: string; expiresAt: number }> = JSON.parse(raw);
+      const now = Date.now();
+      let pruned = false;
+      for (const [token, s] of Object.entries(data)) {
+        if (s && s.userId && s.expiresAt > now && this.users.has(s.userId)) {
+          this.tokenToUserIdMap.set(token, s);
+        } else {
+          pruned = true;
+        }
+      }
+      if (pruned) this.saveSessions();
+    } catch (err) {
+      console.error('[UserManager] Error loading sessions:', err);
+    }
+  }
+
+  private saveSessions() {
+    try {
+      this.ensureDataDir();
+      const obj: Record<string, { userId: string; expiresAt: number }> = {};
+      for (const [token, s] of this.tokenToUserIdMap) {
+        obj[token] = s;
+      }
+      fs.writeFileSync(this.sessionsFilePath, JSON.stringify(obj, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('[UserManager] Error saving sessions:', err);
+    }
+  }
+
   private saveUsers() {
     try {
       this.ensureDataDir();
@@ -93,6 +135,7 @@ export class UserManager {
         password: 'password123',
         avatar: 'av-dragon',
         createdAt: Date.now() - 86400000 * 5,
+        balance: 10000,
         stats: {
           unoWins: 18,
           explodingKittensWins: 14,
@@ -107,6 +150,7 @@ export class UserManager {
         password: 'password123',
         avatar: 'av-cat',
         createdAt: Date.now() - 86400000 * 4,
+        balance: 10000,
         stats: {
           unoWins: 12,
           explodingKittensWins: 25,
@@ -121,6 +165,7 @@ export class UserManager {
         password: 'password123',
         avatar: 'av-ninja',
         createdAt: Date.now() - 86400000 * 3,
+        balance: 10000,
         stats: {
           unoWins: 8,
           explodingKittensWins: 11,
@@ -135,6 +180,7 @@ export class UserManager {
         password: 'password123',
         avatar: 'av-fox',
         createdAt: Date.now() - 86400000 * 2,
+        balance: 10000,
         stats: {
           unoWins: 26,
           explodingKittensWins: 6,
@@ -155,6 +201,7 @@ export class UserManager {
         salt,
         avatar: s.avatar,
         createdAt: s.createdAt,
+        balance: s.balance,
         stats: s.stats
       };
       this.users.set(user.id, user);
@@ -191,6 +238,7 @@ export class UserManager {
       salt,
       avatar: avatar || 'av-fox',
       createdAt: Date.now(),
+      balance: 500,
       stats: {
         unoWins: 0,
         explodingKittensWins: 0,
@@ -204,7 +252,7 @@ export class UserManager {
     this.usernameIndex.set(cleanUsername, id);
     this.saveUsers();
 
-    const token = this.generateToken(id);
+    const token = this.generateToken(id, true);
     return {
       success: true,
       user: this.toPublicUser(newUser),
@@ -214,7 +262,8 @@ export class UserManager {
 
   public login(
     username: string,
-    password: string
+    password: string,
+    remember?: boolean
   ): { success: boolean; user?: PublicUser; token?: string; message?: string } {
     const cleanUsername = username.trim().toLowerCase();
     const userId = this.usernameIndex.get(cleanUsername);
@@ -232,7 +281,7 @@ export class UserManager {
       return { success: false, message: 'Mật khẩu không chính xác.' };
     }
 
-    const token = this.generateToken(user.id);
+    const token = this.generateToken(user.id, remember);
     return {
       success: true,
       user: this.toPublicUser(user),
@@ -241,10 +290,23 @@ export class UserManager {
   }
 
   public getUserByToken(token: string): PublicUser | null {
-    const userId = this.tokenToUserIdMap.get(token);
-    if (!userId) return null;
-    const user = this.users.get(userId);
+    const session = this.tokenToUserIdMap.get(token);
+    if (!session) return null;
+    if (session.expiresAt <= Date.now()) {
+      // Token hết hạn → thu hồi
+      this.tokenToUserIdMap.delete(token);
+      this.saveSessions();
+      return null;
+    }
+    const user = this.users.get(session.userId);
     return user ? this.toPublicUser(user) : null;
+  }
+
+  /** Thu hồi token khi đăng xuất. */
+  public revokeToken(token: string): boolean {
+    const existed = this.tokenToUserIdMap.delete(token);
+    if (existed) this.saveSessions();
+    return existed;
   }
 
   public getUserById(id: string): PublicUser | null {
@@ -289,10 +351,12 @@ export class UserManager {
     }
   }
 
-  public getLeaderboard(gameType: 'all' | 'uno' | 'exploding-kittens' | 'tien-len' = 'all'): PublicUser[] {
+  public getLeaderboard(gameType: 'all' | 'uno' | 'exploding-kittens' | 'tien-len' | 'money' = 'all'): PublicUser[] {
     const list = Array.from(this.users.values()).map(u => this.toPublicUser(u));
 
-    if (gameType === 'uno') {
+    if (gameType === 'money') {
+      list.sort((a, b) => (b.balance || 0) - (a.balance || 0) || b.stats.totalWins - a.stats.totalWins);
+    } else if (gameType === 'uno') {
       list.sort((a, b) => b.stats.unoWins - a.stats.unoWins || b.stats.totalWins - a.stats.totalWins);
     } else if (gameType === 'exploding-kittens') {
       list.sort((a, b) => b.stats.explodingKittensWins - a.stats.explodingKittensWins || b.stats.totalWins - a.stats.totalWins);
@@ -305,18 +369,62 @@ export class UserManager {
     return list.slice(0, 50);
   }
 
-  private generateToken(userId: string): string {
+  private generateToken(userId: string, remember?: boolean): string {
     const token = 'tok_' + crypto.randomUUID().replace(/-/g, '') + Date.now().toString(36);
-    this.tokenToUserIdMap.set(token, userId);
+    const ttl = remember ? this.REMEMBER_TTL_MS : this.SESSION_TTL_MS;
+    this.tokenToUserIdMap.set(token, { userId, expiresAt: Date.now() + ttl });
+    this.saveSessions();
     return token;
   }
 
+  // ========== BALANCE MANAGEMENT ==========
+
+  public addBalance(userId: string, amount: number, reason: string): { success: boolean; newBalance: number } {
+    const user = this.users.get(userId);
+    if (!user || amount <= 0) return { success: false, newBalance: 0 };
+
+    user.balance = (user.balance || 0) + amount;
+    this.saveUsers();
+    console.log(`[Economy] +${amount} coins → ${user.displayName} (${reason}). Balance: ${user.balance}`);
+    return { success: true, newBalance: user.balance };
+  }
+
+  public deductBalance(userId: string, amount: number, reason: string): { success: boolean; newBalance: number; message?: string } {
+    const user = this.users.get(userId);
+    if (!user) return { success: false, newBalance: 0, message: 'User not found' };
+    if (amount <= 0) return { success: false, newBalance: user.balance || 0, message: 'Invalid amount' };
+
+    const currentBalance = user.balance || 0;
+    if (currentBalance < amount) {
+      return { success: false, newBalance: currentBalance, message: `Không đủ tiền. Cần ${amount} 🪙, bạn có ${currentBalance} 🪙` };
+    }
+
+    user.balance = currentBalance - amount;
+    this.saveUsers();
+    console.log(`[Economy] -${amount} coins ← ${user.displayName} (${reason}). Balance: ${user.balance}`);
+    return { success: true, newBalance: user.balance };
+  }
+
+  public getBalance(userId: string): number {
+    const user = this.users.get(userId);
+    return user?.balance ?? 0;
+  }
+
+  // Migrate old users without balance field
+  private migrateUserBalance(user: User): void {
+    if (user.balance === undefined || user.balance === null) {
+      user.balance = 500;
+    }
+  }
+
   private toPublicUser(user: User): PublicUser {
+    this.migrateUserBalance(user);
     return {
       id: user.id,
       username: user.username,
       displayName: user.displayName,
       avatar: user.avatar,
+      balance: user.balance ?? 500,
       stats: { ...user.stats }
     };
   }
