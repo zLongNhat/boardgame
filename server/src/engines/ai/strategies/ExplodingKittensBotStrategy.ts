@@ -88,7 +88,7 @@ export class ExplodingKittensBotStrategy {
     // 4e. Check for Cat pair combos
     const catCounts = new Map<string, string[]>();
     for (const card of myHand) {
-      if (card.type.endsWith('_cat')) {
+      if (card.type.endsWith('_cat') || card.type === 'cattermelon' || card.type === 'feral_cat') {
         const arr = catCounts.get(card.type) || [];
         arr.push(card.id);
         catCounts.set(card.type, arr);

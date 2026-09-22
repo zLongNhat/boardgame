@@ -181,3 +181,43 @@ test('ExplodingKittensGame - Timebomb mode sets turnTimeLimit to 15s', () => {
   assert.strictEqual(game.state.turnTimeLimit, 15, 'Timebomb mode must enforce 15s turn limit');
   game.clearTurnTimer();
 });
+
+test('ExplodingKittensGame - Cattermelon (Mèo dưa hấu) pair combo works', () => {
+  const players = [
+    { id: 'p1', name: 'Alice', avatar: 'av-1', isBot: false },
+    { id: 'p2', name: 'Bob', avatar: 'av-2', isBot: false }
+  ];
+
+  const game = new ExplodingKittensGame(players);
+  game.start();
+
+  const aliceHand: any[] = (game as any).hands.get('p1');
+  const bobHand: any[] = (game as any).hands.get('p2');
+
+  aliceHand.length = 0;
+  aliceHand.push(
+    { id: 'cm-1', type: 'cattermelon' as const, name: 'Mèo Dưa Hấu', description: '' },
+    { id: 'cm-2', type: 'cattermelon' as const, name: 'Mèo Dưa Hấu', description: '' }
+  );
+
+  bobHand.length = 0;
+  bobHand.push({ id: 'target-card', type: 'skip' as const, name: 'Bỏ Qua', description: '' });
+
+  const res = game.handleAction('p1', {
+    type: 'PLAY_CAT_COMBO',
+    cardIds: ['cm-1', 'cm-2'],
+    targetPlayerId: 'p2'
+  });
+
+  assert.strictEqual(res.success, true, 'Playing pair of Cattermelon cards must succeed');
+  assert.ok(game.state.pendingAction, 'Pending action must be created');
+  assert.strictEqual(game.state.pendingAction?.card.type, 'cattermelon');
+
+  // Resolve action
+  (game as any).resolvePendingAction();
+  assert.strictEqual(aliceHand.length, 1, 'Alice should receive stolen card');
+  assert.strictEqual(aliceHand[0].id, 'target-card', 'Alice must have stolen Bob card');
+  assert.strictEqual(bobHand.length, 0, 'Bob card was stolen');
+  game.clearTurnTimer();
+});
+

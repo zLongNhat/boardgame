@@ -16,6 +16,10 @@ interface EKTableViewProps {
   onSendAction: (action: any) => void;
 }
 
+const isCatCard = (type: string): boolean => {
+  return type.endsWith('_cat') || type === 'cattermelon' || type === 'feral_cat';
+};
+
 export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
   gameState,
   myPlayerId,
@@ -83,7 +87,7 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
 
   // Count cards by cat type to identify available pairs
   const catCounts = gameState.myHand.reduce((acc, c) => {
-    if (c.type.endsWith('_cat') || c.type === 'feral_cat') {
+    if (isCatCard(c.type)) {
       acc[c.type] = (acc[c.type] || 0) + 1;
     }
     return acc;
@@ -126,11 +130,11 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
       return;
     }
 
-    // 1. Cat combos (including feral cat)
-    if (card.type.endsWith('_cat') || card.type === 'feral_cat') {
+    // 1. Cat combos (including feral cat and cattermelon)
+    if (isCatCard(card.type)) {
       if (card.type === 'feral_cat') {
         // Feral cat can pair with any other cat card in hand
-        const otherCat = gameState.myHand.find(c => c.id !== card.id && (c.type.endsWith('_cat') || c.type === 'feral_cat'));
+        const otherCat = gameState.myHand.find(c => c.id !== card.id && isCatCard(c.type));
         if (otherCat) {
           setSelectedCards([card.id, otherCat.id]);
           setPendingCardForAction(card);
@@ -821,8 +825,8 @@ export const ExplodingKittensTableView: React.FC<EKTableViewProps> = ({
               const isSelected = selectedCards.includes(card.id);
               const fan = calcFanTransform(i, totalCards);
               const isHovered = hoveredCardId === card.id && !isDraggingCard;
-              const isCatCard = card.type.endsWith('_cat') || card.type === 'feral_cat';
-              const hasPairInHand = isCatCard && ((catCounts[card.type] || 0) >= 2 || (card.type !== 'feral_cat' && feralCount > 0) || (card.type === 'feral_cat' && totalCards >= 2));
+              const isCat = isCatCard(card.type);
+              const hasPairInHand = isCat && ((catCounts[card.type] || 0) >= 2 || (card.type !== 'feral_cat' && feralCount > 0) || (card.type === 'feral_cat' && totalCards >= 2));
 
               return (
                 <motion.div

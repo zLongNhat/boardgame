@@ -379,7 +379,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
       return { success: false, message: 'Lá bài này không thể đánh như một hành động bình thường.' };
     }
 
-    if (card.type.endsWith('_cat') || card.type === 'feral_cat') {
+    if (card.type.endsWith('_cat') || card.type === 'cattermelon' || card.type === 'feral_cat') {
       return { success: false, message: 'Thẻ mèo phải được đánh theo cặp để cướp bài.' };
     }
 
@@ -430,8 +430,8 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
       return { success: false, message: 'Đánh combo mèo yêu cầu đúng 2 hoặc 3 lá.' };
     }
 
-    // Check validity including feral_cat (wild)
-    const isCat = (t: ExplodingKittensCardType) => t.endsWith('_cat') || t === 'feral_cat';
+    // Check validity including feral_cat (wild) and cattermelon
+    const isCat = (t: ExplodingKittensCardType) => t.endsWith('_cat') || t === 'cattermelon' || t === 'feral_cat';
     if (!selectedCards.every(c => isCat(c.type))) {
       return { success: false, message: 'Chỉ các thẻ mèo hoặc Mèo Hoang mới có thể ghép combo.' };
     }
