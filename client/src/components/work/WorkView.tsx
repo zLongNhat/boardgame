@@ -93,11 +93,44 @@ export const WorkView: React.FC<WorkViewProps> = ({ user, socket, onBack, onBala
     return () => clearInterval(interval);
   }, [expiresAt, cooldownUntil, currentWord, result, user, socket]);
 
-  // Auto-focus input
+  // Auto-focus input continuously when challenge is active
   useEffect(() => {
     if (currentWord && !result) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      inputRef.current?.focus();
+      const t1 = setTimeout(() => inputRef.current?.focus(), 50);
+      const t2 = setTimeout(() => inputRef.current?.focus(), 150);
+      const t3 = setTimeout(() => inputRef.current?.focus(), 300);
+      const t4 = setTimeout(() => inputRef.current?.focus(), 600);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+        clearTimeout(t4);
+      };
     }
+  }, [currentWord, result]);
+
+  // Global keydown listener: redirects keystrokes to input in capture phase so typing is never lost
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (!currentWord || result) return;
+
+      const activeEl = document.activeElement as HTMLElement | null;
+      if (activeEl === inputRef.current) return;
+      if (activeEl && (activeEl.tagName === 'BUTTON' || activeEl.tagName === 'A' || activeEl.tagName === 'SELECT')) {
+        return;
+      }
+
+      if (e.key.length === 1 || e.key === 'Backspace') {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown, true);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true);
   }, [currentWord, result]);
 
   const requestWork = () => {
@@ -355,7 +388,8 @@ export const WorkView: React.FC<WorkViewProps> = ({ user, socket, onBack, onBala
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="w-full flex flex-col items-center gap-8 bg-gray-800/30 p-8 rounded-3xl border border-gray-700/50 backdrop-blur"
+              onClick={() => inputRef.current?.focus()}
+              className="w-full flex flex-col items-center gap-8 bg-gray-800/30 p-8 rounded-3xl border border-gray-700/50 backdrop-blur cursor-text"
             >
               <div className="text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-500/40 text-indigo-300">
                 {wordLang === 'en' ? '🇬🇧 English words' : '🇻🇳 Từ tiếng Việt'}
@@ -371,7 +405,7 @@ export const WorkView: React.FC<WorkViewProps> = ({ user, socket, onBack, onBala
                 />
               </div>
 
-              <div className="w-full max-w-md relative">
+              <div className="w-full max-w-md relative" onClick={(e) => { e.stopPropagation(); inputRef.current?.focus(); }}>
                 <input
                   ref={inputRef}
                   type="text"
@@ -385,6 +419,7 @@ export const WorkView: React.FC<WorkViewProps> = ({ user, socket, onBack, onBala
                   placeholder={t('work.typeHere')}
                   autoComplete="off"
                   spellCheck="false"
+                  autoFocus
                 />
                 
                 {renderColoredText()}
