@@ -26,7 +26,8 @@ export function registerSocketHandlers(
     isHost: p.isHost,
     isBot: p.isBot,
     isReady: p.isReady,
-    connected: p.connected
+    connected: p.connected,
+    hasPaidBet: p.hasPaidBet
   });
 
   const formatRoomDTO = (room: Room) => ({
@@ -71,8 +72,8 @@ export function registerSocketHandlers(
         }
         return;
       }
-      // Kiểm tra số dư chủ phòng trước khi tạo (trừ thật lúc start game)
-      if (userId) {
+      // Kiểm tra và trừ tiền chủ phòng ngay khi tạo phòng (nếu là user đã đăng nhập)
+      if (userId && bet > 0) {
         const bal = userManager.getBalance(userId);
         if (bal < bet) {
           if (typeof callback === 'function') {
@@ -80,8 +81,25 @@ export function registerSocketHandlers(
           }
           return;
         }
+        const deductRes = userManager.deductBalance(userId, bet, `Tạo phòng cược ${bet} 🪙`);
+        if (!deductRes.success) {
+          if (typeof callback === 'function') {
+            callback({ success: false, message: deductRes.message || 'Không thể trừ tiền tạo phòng.' });
+          }
+          return;
+        }
       }
+
       const room = roomManager.createRoom(sessionId, playerName, avatar, socket.id, userId, bet);
+      if (userId && bet > 0) {
+        if (!room.paidUsers) room.paidUsers = {};
+        room.paidUsers[userId] = bet;
+        if (room.players[0]) {
+          room.players[0].hasPaidBet = true;
+        }
+        socket.emit('balance_updated', { balance: userManager.getBalance(userId) });
+      }
+
       socket.join(room.id);
 
       if (typeof callback === 'function') {
@@ -90,12 +108,52 @@ export function registerSocketHandlers(
       broadcastRoomState(room);
     });
 
-    // Handle Join Room
+    // Handle Join Room (trừ tiền cược ngay khi tham gia)
     socket.on('join_room', (data, callback) => {
       const { roomId, sessionId, playerName, avatar, userId } = data;
+      const targetRoom = roomManager.getRoom(roomId);
+      if (!targetRoom) {
+        if (typeof callback === 'function') {
+          callback({ success: false, message: 'Không tìm thấy phòng chơi.' });
+        }
+        return;
+      }
+
+      const existing = targetRoom.players.find(p => p.sessionId === sessionId);
+      const betAmount = Math.floor(Number(targetRoom.settings?.betAmount || 0));
+
+      // Nếu là người chơi mới tham gia (không phải reconnect), kiểm tra số dư trước
+      if (!existing && userId && betAmount > 0) {
+        const bal = userManager.getBalance(userId);
+        if (bal < betAmount) {
+          if (typeof callback === 'function') {
+            callback({ success: false, message: `Không đủ tiền vào phòng! Cần ${betAmount} 🪙 (bạn đang có ${bal} 🪙). Hãy làm việc kiếm thêm!` });
+          }
+          return;
+        }
+      }
+
       const res = roomManager.joinRoom(roomId, sessionId, playerName, avatar, socket.id, userId);
 
       if (res.success && res.room && res.player) {
+        // Trừ tiền người mới vào phòng
+        if (!existing && userId && betAmount > 0) {
+          const deductRes = userManager.deductBalance(userId, betAmount, `Cược vào phòng ${res.room.id}`);
+          if (!deductRes.success) {
+            roomManager.leaveRoom(res.room.id, res.player.id);
+            if (typeof callback === 'function') {
+              callback({ success: false, message: deductRes.message || 'Không thể trừ tiền cược vào phòng.' });
+            }
+            return;
+          }
+          if (!res.room.paidUsers) res.room.paidUsers = {};
+          res.room.paidUsers[userId] = betAmount;
+          res.player.hasPaidBet = true;
+          socket.emit('balance_updated', { balance: userManager.getBalance(userId) });
+        } else if (existing && userId && res.room.paidUsers?.[userId]) {
+          res.player.hasPaidBet = true;
+        }
+
         socket.join(res.room.id);
         if (typeof callback === 'function') {
           callback({ success: true, room: formatRoomDTO(res.room), player: formatPlayerDTO(res.player) });
@@ -122,6 +180,9 @@ export function registerSocketHandlers(
         player.connected = true;
         player.socketId = socket.id;
         if (userId) player.userId = userId;
+        if (userId && room.paidUsers?.[userId]) {
+          player.hasPaidBet = true;
+        }
         socket.join(room.id);
 
         if (room.gameInstance) {
@@ -155,10 +216,25 @@ export function registerSocketHandlers(
       if (typeof callback === 'function') callback(res);
     });
 
-    // Handle Remove Bot / Kick Player
+    // Handle Remove Bot / Kick Player (hoàn tiền nếu đã trừ cược trước game)
     socket.on('remove_bot', (data, callback) => {
       const { roomId, requesterId, targetPlayerId } = data;
+      const roomBefore = roomManager.getRoom(roomId);
+      const targetPlayer = roomBefore?.players.find(p => p.id === targetPlayerId);
+      const wasInGame = roomBefore?.inGame;
+
       const res = roomManager.removeBotOrKick(roomId, requesterId, targetPlayerId);
+
+      // Nếu bị kick trước khi game bắt đầu và đã nộp cược -> hoàn tiền cho người bị kick
+      if (res.success && !wasInGame && targetPlayer?.userId && roomBefore?.paidUsers?.[targetPlayer.userId]) {
+        const refundAmt = roomBefore.paidUsers[targetPlayer.userId];
+        delete roomBefore.paidUsers[targetPlayer.userId];
+        userManager.addBalance(targetPlayer.userId, refundAmt, `Hoàn tiền bị kick khỏi phòng ${roomId}`);
+        if (targetPlayer.socketId) {
+          io.to(targetPlayer.socketId).emit('balance_updated', { balance: userManager.getBalance(targetPlayer.userId) });
+        }
+      }
+
       const room = roomManager.getRoom(roomId);
       if (room) broadcastRoomState(room);
       if (typeof callback === 'function') callback(res);
@@ -167,9 +243,41 @@ export function registerSocketHandlers(
     // Handle Update Settings
     socket.on('update_settings', (data, callback) => {
       const { roomId, requesterId, settings } = data;
-      const res = roomManager.updateSettings(roomId, requesterId, settings);
       const room = roomManager.getRoom(roomId);
-      if (room) broadcastRoomState(room);
+      if (room && settings?.betAmount !== undefined) {
+        const newBet = Math.floor(Number(settings.betAmount));
+        if (room.players.length > 1 && newBet !== room.settings.betAmount) {
+          if (typeof callback === 'function') {
+            callback({ success: false, message: 'Không thể đổi mức cược khi đã có người chơi khác trong phòng.' });
+          }
+          return;
+        }
+        // Nếu chủ phòng ở một mình, điều chỉnh số dư theo chênh lệch
+        if (room.players.length === 1 && newBet !== room.settings.betAmount && room.players[0].userId) {
+          const hostUid = room.players[0].userId;
+          const oldPaid = room.paidUsers?.[hostUid] || 0;
+          const diff = newBet - oldPaid;
+          if (diff > 0) {
+            const hostBal = userManager.getBalance(hostUid);
+            if (hostBal < diff) {
+              if (typeof callback === 'function') {
+                callback({ success: false, message: `Không đủ tiền tăng cược thêm ${diff} 🪙 (đang có ${hostBal} 🪙).` });
+              }
+              return;
+            }
+            userManager.deductBalance(hostUid, diff, `Tăng mức cược phòng ${roomId}`);
+          } else if (diff < 0) {
+            userManager.addBalance(hostUid, Math.abs(diff), `Giảm mức cược phòng ${roomId}`);
+          }
+          if (!room.paidUsers) room.paidUsers = {};
+          room.paidUsers[hostUid] = newBet;
+          socket.emit('balance_updated', { balance: userManager.getBalance(hostUid) });
+        }
+      }
+
+      const res = roomManager.updateSettings(roomId, requesterId, settings);
+      const updatedRoom = roomManager.getRoom(roomId);
+      if (updatedRoom) broadcastRoomState(updatedRoom);
       if (typeof callback === 'function') callback(res);
     });
 
@@ -182,40 +290,37 @@ export function registerSocketHandlers(
       if (typeof callback === 'function') callback(res);
     });
 
-    // Handle Start Game (kèm cược phòng multiplayer)
+    // Handle Start Game (trả thưởng x15 - x30 lần cược cho người thắng)
     socket.on('start_game', (data, callback) => {
       const { roomId, requesterId } = data;
       const roomBefore = roomManager.getRoom(roomId);
-      const betAmount = Math.floor(Number(roomBefore?.settings?.betAmount || 0));
+      if (!roomBefore) {
+        if (typeof callback === 'function') callback({ success: false, message: 'Phòng không tồn tại.' });
+        return;
+      }
+      const betAmount = Math.floor(Number(roomBefore.settings?.betAmount || 0));
 
-      // Thu tiền cược phòng trước khi start: chỉ trừ tài khoản đã đăng nhập, bỏ qua Guest/Bot
-      let payers: Array<{ playerId: string; userId: string }> = [];
-      if (roomBefore && betAmount > 0) {
-        payers = roomBefore.players
-          .filter(p => !p.isBot && p.userId)
-          .map(p => ({ playerId: p.id, userId: p.userId! }));
+      // Đảm bảo tất cả người chơi thật (đã đăng nhập) đều đã trừ tiền cược trước khi trận bắt đầu
+      if (betAmount > 0) {
+        if (!roomBefore.paidUsers) roomBefore.paidUsers = {};
+        const unpaidHumans = roomBefore.players.filter(p => !p.isBot && p.userId && !roomBefore.paidUsers?.[p.userId]);
 
-        for (const p of payers) {
-          const bal = userManager.getBalance(p.userId);
+        for (const p of unpaidHumans) {
+          const bal = userManager.getBalance(p.userId!);
           if (bal < betAmount) {
-            const offender = roomBefore.players.find(x => x.id === p.playerId);
             if (typeof callback === 'function') {
-              callback({ success: false, message: `Không đủ tiền cược phòng: ${offender?.name || 'người chơi'} cần ${betAmount} 🪙 (đang có ${bal} 🪙).` });
+              callback({ success: false, message: `Người chơi ${p.name} không đủ tiền cược: cần ${betAmount} 🪙 (đang có ${bal} 🪙).` });
             }
             return;
           }
         }
 
-        for (const p of payers) {
-          const r = userManager.deductBalance(p.userId, betAmount, `Room bet ${roomId} (${roomBefore.settings.gameType})`);
-          if (!r.success) {
-            // Hoàn tiền những người đã trừ nếu có lỗi giữa chừng
-            for (const done of payers) {
-              if (done.userId === p.userId) break;
-              userManager.addBalance(done.userId, betAmount, `Refund room bet ${roomId}`);
-            }
-            if (typeof callback === 'function') callback({ success: false, message: r.message || 'Lỗi trừ tiền cược phòng.' });
-            return;
+        for (const p of unpaidHumans) {
+          const r = userManager.deductBalance(p.userId!, betAmount, `Room bet ${roomId} (${roomBefore.settings.gameType})`);
+          if (r.success) {
+            roomBefore.paidUsers[p.userId!] = betAmount;
+            p.hasPaidBet = true;
+            if (p.socketId) io.to(p.socketId).emit('balance_updated', { balance: userManager.getBalance(p.userId!) });
           }
         }
       }
@@ -229,30 +334,54 @@ export function registerSocketHandlers(
         onGameOver: (r, winners) => {
           if (winners && winners.length > 0) {
             const participantUserIds = r.players.filter(p => p.userId).map(p => p.userId!);
-            const winnerUserIds = r.players.filter(p => winners.includes(p.id) && p.userId).map(p => p.userId!);
+            const winnerPlayers = r.players.filter(p => winners.includes(p.id));
+            const winnerUserIds = winnerPlayers.filter(p => p.userId).map(p => p.userId!);
             userManager.recordGameResult(r.settings.gameType, participantUserIds, winnerUserIds);
-            // Trả thưởng pot cho người thắng đã đăng nhập (Guest/Bot không nhận)
+
             const potBet = Math.floor(Number(r.settings?.betAmount || 0));
-            if (potBet > 0 && payers.length > 0 && winnerUserIds.length > 0) {
-              const potTotal = potBet * payers.length;
-              const share = Math.floor(potTotal / winnerUserIds.length);
+            if (potBet > 0 && winnerUserIds.length > 0) {
+              // Tiền thắng từ tạo phòng gấp 15-30 lần mức cược
+              const multiplier = 15 + Math.floor(Math.random() * 16); // 15 đến 30
+              const totalPrize = potBet * multiplier;
+              const perWinner = Math.floor(totalPrize / winnerUserIds.length);
+
               for (const uid of winnerUserIds) {
-                userManager.addBalance(uid, share, `Room win ${r.id} (${r.settings.gameType}) pot ${potTotal}`);
+                userManager.addBalance(uid, perWinner, `Thắng phòng ${r.id} (${r.settings.gameType}) x${multiplier} cược`);
+                const winP = r.players.find(p => p.userId === uid);
+                if (winP?.socketId) {
+                  io.to(winP.socketId).emit('balance_updated', { balance: userManager.getBalance(uid) });
+                }
               }
-              roomManager.addChatMessage(r.id, 'System', `🏆 Pot ${potTotal} 🪙 → ${winnerUserIds.length} người thắng, mỗi người +${share} 🪙.`, true);
+
+              const winnerNames = winnerPlayers.map(p => p.name).join(', ');
+              roomManager.addChatMessage(
+                r.id,
+                'System',
+                `🏆 CHIẾN THẮNG VANG DỘI! ${winnerNames} đã thắng và nhận thưởng gấp ${multiplier} LẦN cược (+${perWinner.toLocaleString()} 🪙)! 🎉`,
+                true
+              );
+            } else if (winnerPlayers.length > 0) {
+              const winnerNames = winnerPlayers.map(p => p.name).join(', ');
+              roomManager.addChatMessage(
+                r.id,
+                'System',
+                `🏆 Trận đấu kết thúc! Người chiến thắng: ${winnerNames}.`,
+                true
+              );
             }
+
             io.emit('leaderboard_updated', userManager.getLeaderboard('all'));
           }
+
+          // Reset trạng thái thanh toán cược cho ván chơi tiếp theo
+          r.paidUsers = {};
+          for (const p of r.players) {
+            p.hasPaidBet = false;
+          }
+
           broadcastRoomState(r);
         }
       });
-
-      // Nếu start thất bại sau khi đã trừ tiền → hoàn tiền
-      if (!res.success && betAmount > 0 && payers.length > 0) {
-        for (const p of payers) {
-          userManager.addBalance(p.userId, betAmount, `Refund room bet ${roomId} (start failed)`);
-        }
-      }
 
       const room = roomManager.getRoom(roomId);
       if (room) broadcastRoomState(room);
@@ -264,7 +393,13 @@ export function registerSocketHandlers(
       const { roomId, requesterId } = data;
       const res = roomManager.restartGame(roomId, requesterId);
       const room = roomManager.getRoom(roomId);
-      if (room) broadcastRoomState(room);
+      if (room) {
+        room.paidUsers = {};
+        for (const p of room.players) {
+          p.hasPaidBet = false;
+        }
+        broadcastRoomState(room);
+      }
       if (typeof callback === 'function') callback(res);
     });
 
@@ -291,11 +426,38 @@ export function registerSocketHandlers(
       if (room) broadcastRoomState(room);
     });
 
-    // Handle Leave Room
+    // Handle Leave Room (hoàn trả tiền nếu rời trước khi trận bắt đầu)
     socket.on('leave_room', (data, callback) => {
       const { roomId, playerId } = data;
+      const roomBefore = roomManager.getRoom(roomId);
+      const playerObj = roomBefore?.players.find(p => p.id === playerId);
+      const wasInGame = roomBefore?.inGame;
+
       const res = roomManager.leaveRoom(roomId, playerId);
       socket.leave(roomId);
+
+      // Nếu rời phòng trước khi bắt đầu trận và đã trừ tiền cược -> hoàn trả tiền
+      if (!wasInGame && playerObj?.userId && roomBefore?.paidUsers?.[playerObj.userId]) {
+        const refundAmt = roomBefore.paidUsers[playerObj.userId];
+        delete roomBefore.paidUsers[playerObj.userId];
+        userManager.addBalance(playerObj.userId, refundAmt, `Hoàn tiền rời phòng ${roomId}`);
+        socket.emit('balance_updated', { balance: userManager.getBalance(playerObj.userId) });
+      }
+
+      // Nếu phòng bị giải tán (res.roomDeleted), hoàn tiền cho tất cả người chơi còn lại đã nộp tiền
+      if (res.roomDeleted && roomBefore?.paidUsers) {
+        for (const [uid, amt] of Object.entries(roomBefore.paidUsers)) {
+          if (amt > 0) {
+            userManager.addBalance(uid, amt, `Hoàn tiền giải tán phòng ${roomId}`);
+            const uPlayer = roomBefore.players.find(p => p.userId === uid);
+            if (uPlayer?.socketId) {
+              io.to(uPlayer.socketId).emit('balance_updated', { balance: userManager.getBalance(uid) });
+            }
+          }
+        }
+        roomBefore.paidUsers = {};
+      }
+
       const room = roomManager.getRoom(roomId);
       if (room) {
         broadcastRoomState(room);

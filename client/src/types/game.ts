@@ -43,6 +43,7 @@ export interface RoomPlayer {
   isBot: boolean;
   isReady: boolean;
   connected: boolean;
+  hasPaidBet?: boolean;
 }
 
 export interface ChatMessage {

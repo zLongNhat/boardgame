@@ -91,6 +91,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshUser();
+
+    const handleBalanceUpdate = (e: any) => {
+      if (e?.detail?.balance !== undefined) {
+        setUser((prev) => (prev ? { ...prev, balance: e.detail.balance } : prev));
+      } else {
+        refreshUser();
+      }
+    };
+
+    window.addEventListener('omnideck:balance_updated', handleBalanceUpdate);
+    return () => {
+      window.removeEventListener('omnideck:balance_updated', handleBalanceUpdate);
+    };
   }, []);
 
   const login = async (username: string, password: string, remember: boolean = true): Promise<{ success: boolean; message?: string }> => {

@@ -454,6 +454,11 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                               {t('room.bot')}
                             </span>
                           )}
+                          {p.hasPaidBet && (
+                            <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-0.5">
+                              <Coins className="w-2.5 h-2.5" /> {room.settings.betAmount}🪙
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-gray-500 flex items-center gap-1">
                           <span className={`w-1.5 h-1.5 rounded-full ${p.connected ? 'bg-emerald-400' : 'bg-gray-600'}`} />

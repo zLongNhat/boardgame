@@ -96,6 +96,10 @@ export function useGameSocket() {
       setAlterFutureCards(data.cards);
     });
 
+    s.on('balance_updated', (data: { balance: number }) => {
+      window.dispatchEvent(new CustomEvent('omnideck:balance_updated', { detail: data }));
+    });
+
     setSocket(s);
 
     return () => {

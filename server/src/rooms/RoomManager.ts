@@ -17,6 +17,7 @@ export interface RoomPlayer {
   isReady: boolean;
   connected: boolean;
   socketId: string | null;
+  hasPaidBet?: boolean;
 }
 
 export interface ChatMessage {
@@ -64,6 +65,7 @@ export interface Room {
   botController: BotController | null;
   chatMessages: ChatMessage[];
   createdAt: number;
+  paidUsers?: Record<string, number>; // userId -> betAmount
 }
 
 const BOT_NAMES = [
@@ -136,7 +138,8 @@ export class RoomManager {
           isSystem: true
         }
       ],
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      paidUsers: {}
     };
 
     this.rooms.set(roomId, room);
@@ -238,7 +241,7 @@ export class RoomManager {
     return { success: true };
   }
 
-  public removeBotOrKick(roomId: string, requesterId: string, targetPlayerId: string): { success: boolean; message?: string } {
+  public removeBotOrKick(roomId: string, requesterId: string, targetPlayerId: string): { success: boolean; removedPlayer?: RoomPlayer; message?: string } {
     const room = this.rooms.get(roomId);
     if (!room) return { success: false, message: 'Room not found.' };
     if (room.hostId !== requesterId) return { success: false, message: 'Only host can kick players or bots.' };
@@ -252,10 +255,10 @@ export class RoomManager {
     this.sessionToRoomMap.delete(removed.sessionId);
     this.addChatMessage(room.id, 'System', `${removed.name} was removed from the room.`, true);
 
-    return { success: true };
+    return { success: true, removedPlayer: removed };
   }
 
-  public leaveRoom(roomId: string, playerId: string): { success: boolean; roomDeleted?: boolean; message?: string } {
+  public leaveRoom(roomId: string, playerId: string): { success: boolean; roomDeleted?: boolean; removedPlayer?: RoomPlayer; message?: string } {
     const room = this.rooms.get(roomId);
     if (!room) return { success: true, roomDeleted: true };
 
@@ -278,7 +281,7 @@ export class RoomManager {
         room.botController.destroy();
       }
       this.rooms.delete(room.id);
-      return { success: true, roomDeleted: true };
+      return { success: true, roomDeleted: true, removedPlayer };
     }
 
     // If host left, transfer host role to the next human player
@@ -292,7 +295,7 @@ export class RoomManager {
     }
 
     this.addChatMessage(room.id, 'System', `${removedPlayer.name} đã rời phòng.`, true);
-    return { success: true, roomDeleted: false };
+    return { success: true, roomDeleted: false, removedPlayer };
   }
 
   public updateSettings(roomId: string, requesterId: string, newSettings: Partial<RoomSettings>): { success: boolean; message?: string } {
@@ -454,8 +457,10 @@ export class RoomManager {
     }
 
     room.inGame = false;
+    room.paidUsers = {};
     for (const p of room.players) {
       p.isReady = p.isBot; // Bots are always ready
+      p.hasPaidBet = false;
     }
 
     this.addChatMessage(room.id, 'System', `Returned to lobby.`, true);
