@@ -7,6 +7,12 @@
   - **Mèo Nổ (Exploding Kittens)**: Khắc phục lỗi truyền `this.state.direction` (-1) vào `advanceTurn` / `getNextPlayerIndex`, khiến vòng lặp `while (count < skipCount)` bị bỏ qua dẫn tới lượt chơi bị kẹt vĩnh viễn trên 1 người. Đã chuyển toàn bộ thành `advanceTurn(1, pendingTurns)`.
   - **UNO**: Xóa bỏ cơ chế `advanceStep = 2` khi còn 2 người chơi (vốn biến lá Đảo Chiều thành lá Bỏ Lượt / Skip khiến người đánh được đi tiếp và rút/đánh bài liên tục). Giờ đây lá Đảo Chiều luôn đảo hướng và chuyển lượt sang đối thủ (`advanceStep = 1`).
   - **BaseGame.ts**: Bổ sung cơ chế phòng thủ `Math.max(1, Math.abs(skipCount))` trong `getNextPlayerIndex` ngăn chặn triệt để mọi trường hợp kẹt lượt chơi nếu có tham số âm hoặc 0.
+- [x] **Cập nhật Luật Cộng Dồn Toàn Diện (Universal Stacking) trong UNO**:
+  - Không bắt buộc lá cộng dồn sau phải có giá trị phạt $\ge$ lá trước nữa (cho phép dồn tự do mọi cấp độ phạt).
+  - Tất cả các lá cộng (+2, +4, +6, +8, +10, wild reverse 4) đều có thể cộng dồn lên nhau:
+    - **Lá Wild (Đen)**: Có thể cộng dồn đè lên bất kỳ lá phạt nào.
+    - **Lá màu (+2, +4 có màu)**: Chỉ cần cùng màu với màu đang hiện hành (`activeColor`) hoặc cùng loại lá cộng là được phép dồn tiếp (ví dụ: Wild +8 đổi sang Đỏ thì có thể dồn tiếp +2 Đỏ, +4 Đỏ, hoặc các lá Wild khác).
+
 
 
 ---

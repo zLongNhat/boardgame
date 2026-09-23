@@ -98,13 +98,35 @@ test('UnoGame - No Mercy +4 +6 +8 +10 Black Cards Stacking & Deck Composition', 
 
   game.state.pendingDrawCount = 6;
   game.state.pendingDrawType = 'wild_draw_six';
+  game.state.activeColor = 'red';
 
   const cardEight = { id: 'c8', color: 'wild' as const, value: 'wild_draw_eight' as const, pointValue: 80 };
   const cardFour = { id: 'c4', color: 'wild' as const, value: 'wild_draw_four' as const, pointValue: 50 };
+  const redDrawTwo = { id: 'c2-red', color: 'red' as const, value: 'draw_two' as const, pointValue: 20 };
+  const blueDrawTwo = { id: 'c2-blue', color: 'blue' as const, value: 'draw_two' as const, pointValue: 20 };
+  const redDrawFour = { id: 'c4-red', color: 'red' as const, value: 'draw_four' as const, pointValue: 40 };
 
-  // In No Mercy, can stack equal or higher penalty: +8 can stack on +6, +4 cannot stack on +6
-  assert.strictEqual(game.isPlayValid(cardEight, false, 'p1'), true, '+8 can stack on +6');
-  assert.strictEqual(game.isPlayValid(cardFour, false, 'p1'), false, '+4 cannot stack on +6 in No Mercy');
+  // All draw cards can stack:
+  // Wild +8 can stack
+  assert.strictEqual(game.isPlayValid(cardEight, false, 'p1'), true, 'Wild +8 can stack on +6');
+  // Wild +4 can stack (no longer blocked by lower value!)
+  assert.strictEqual(game.isPlayValid(cardFour, false, 'p1'), true, 'Wild +4 can stack on +6');
+  // Red +2 can stack because active color is Red!
+  assert.strictEqual(game.isPlayValid(redDrawTwo, false, 'p1'), true, 'Red +2 can stack on Red +6');
+  // Red +4 can stack because active color is Red!
+  assert.strictEqual(game.isPlayValid(redDrawFour, false, 'p1'), true, 'Red +4 can stack on Red +6');
+  // Blue +2 cannot stack because active color is Red and value does not match +6
+  assert.strictEqual(game.isPlayValid(blueDrawTwo, false, 'p1'), false, 'Blue +2 cannot stack on Red +6');
+
+  // Now test user scenario: Wild +8 Red, stack +2 and +4
+  game.state.pendingDrawCount = 8;
+  game.state.pendingDrawType = 'wild_draw_eight';
+  game.state.activeColor = 'red';
+  game.state.topCard = cardEight;
+
+  assert.strictEqual(game.isPlayValid(redDrawTwo, false, 'p1'), true, 'Red +2 can stack on Wild +8 Red');
+  assert.strictEqual(game.isPlayValid(redDrawFour, false, 'p1'), true, 'Red +4 can stack on Wild +8 Red');
+  assert.strictEqual(game.isPlayValid(cardFour, false, 'p1'), true, 'Wild +4 can stack on Wild +8 Red');
 
   game.clearTurnTimer();
 });

@@ -223,18 +223,34 @@ export class UnoGame extends BaseGame<UnoGameState, UnoAction, MaskedUnoGameStat
         'wild_draw_ten': 10
       };
       const cardDrawVal = drawValues[effectiveValue] || 0;
-      const pendingDrawVal = drawValues[this.state.pendingDrawType || ''] || 0;
+
+      if (cardDrawVal === 0) {
+        return false;
+      }
 
       if (this.state.rules.freeStacking) {
-        // No Mercy stacking: can only stack with equal or higher draw value
-        if (this.state.mode === 'no-mercy') {
-          return cardDrawVal > 0 && cardDrawVal >= pendingDrawVal;
+        // Universal Stacking: all draw cards can stack onto each other regardless of value!
+        // Wild draw cards (+4, +6, +8, +10, wild reverse 4) can always stack.
+        if (effectiveColor === 'wild') {
+          return true;
         }
-        // Classic stacking: any draw card can stack
-        return cardDrawVal > 0;
+        // Colored draw cards can stack if matching active color, or matching same draw type
+        if (effectiveColor === this.state.activeColor) {
+          return true;
+        }
+        if (effectiveValue === this.state.topCard.value || effectiveValue === this.state.pendingDrawType) {
+          return true;
+        }
+        return false;
       } else {
-        // Must match exact draw card type in strict mode
-        return effectiveValue === this.state.pendingDrawType;
+        // Strict mode: must match exact draw card type
+        if (effectiveValue !== this.state.pendingDrawType) {
+          return false;
+        }
+        if (effectiveColor === 'wild' || effectiveColor === this.state.activeColor) {
+          return true;
+        }
+        return effectiveValue === this.state.topCard.value;
       }
     }
 
