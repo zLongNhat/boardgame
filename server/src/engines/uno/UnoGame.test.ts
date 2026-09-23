@@ -108,3 +108,35 @@ test('UnoGame - No Mercy +4 +6 +8 +10 Black Cards Stacking & Deck Composition', 
 
   game.clearTurnTimer();
 });
+
+test('UnoGame - 2-player game Reverse alternates turn to opponent instead of giving infinite turns', () => {
+  const players = [
+    { id: 'p1', name: 'Alice', avatar: 'av-1', isBot: false },
+    { id: 'p2', name: 'Bob', avatar: 'av-2', isBot: false }
+  ];
+
+  const game = new UnoGame(players, {
+    mode: 'classic',
+    rules: { freeStacking: true }
+  });
+  game.start();
+
+  game.state.currentTurnIndex = 0; // Alice starts
+  game.state.activeColor = 'red';
+  game.state.topCard = { id: 'top', color: 'red', value: '1', pointValue: 1 };
+
+  const aliceHand: any[] = (game as any).hands.get('p1');
+  const reverseCard = { id: 'rev-red', color: 'red' as const, value: 'reverse' as const, pointValue: 20 };
+  aliceHand.push(reverseCard);
+
+  // Alice plays reverse card
+  const res = game.handleAction('p1', { type: 'PLAY_CARD', cardId: 'rev-red' });
+  assert.strictEqual(res.success, true);
+
+  // Turn MUST advance to Bob (index 1), NOT stay with Alice!
+  assert.strictEqual(game.state.currentTurnIndex, 1, 'Turn must pass to Bob when Alice plays Reverse in 2-player game');
+  assert.strictEqual(game.state.direction, -1, 'Direction must be reversed');
+
+  game.clearTurnTimer();
+});
+

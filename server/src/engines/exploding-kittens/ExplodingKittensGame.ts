@@ -501,7 +501,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
       case 'attack': {
         this.addLog(`${player.name} tấn công! Người kế tiếp phải đánh 2 lượt!`, 'action', playerId);
         this.state.pendingTurnsForCurrentPlayer = 0;
-        this.advanceTurn(this.state.direction, 2);
+        this.advanceTurn(1, 2);
         break;
       }
 
@@ -521,11 +521,11 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
       }
 
       case 'reverse': {
-        this.state.direction = this.state.direction === 1 ? -1 : 1;
+        this.state.direction = (this.state.direction === 1 ? -1 : 1) as (1 | -1);
         this.addLog(`${player.name} đánh lá ĐẢO CHIỀU! Vòng chơi đổi hướng (${this.state.direction === 1 ? 'Thuận' : 'Ngược'}).`, 'action', playerId);
         this.state.pendingTurnsForCurrentPlayer--;
         if (this.state.pendingTurnsForCurrentPlayer <= 0) {
-          this.advanceTurn(this.state.direction, 1);
+          this.advanceTurn(1, 1);
         } else {
           this.resetTurnTimer();
         }
@@ -536,7 +536,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
         this.addLog(`${player.name} bỏ qua lượt này mà không cần rút bài!`, 'action', playerId);
         this.state.pendingTurnsForCurrentPlayer--;
         if (this.state.pendingTurnsForCurrentPlayer <= 0) {
-          this.advanceTurn(this.state.direction, 1);
+          this.advanceTurn(1, 1);
         } else {
           this.addLog(`${player.name} còn lại ${this.state.pendingTurnsForCurrentPlayer} lượt phải đánh.`, 'info', playerId);
           this.resetTurnTimer();
@@ -547,7 +547,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
       case 'super_skip': {
         this.addLog(`${player.name} kích hoạt SIÊU BỎ QUA! Kết thúc toàn bộ các lượt phải đánh!`, 'special', playerId);
         this.state.pendingTurnsForCurrentPlayer = 0;
-        this.advanceTurn(this.state.direction, 1);
+        this.advanceTurn(1, 1);
         break;
       }
 
@@ -623,7 +623,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
         this.addLog(`☣️ CATOMIC BOMB! Toàn bộ ${kittens.length} Mèo Nổ đã được gom lên trên cùng của bộ bài!`, 'warning', playerId);
         // Catomic ends turn without drawing
         this.state.pendingTurnsForCurrentPlayer = 0;
-        this.advanceTurn(this.state.direction, 1);
+        this.advanceTurn(1, 1);
         break;
       }
 
@@ -657,7 +657,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
       case 'share_the_future': {
         const top3 = this.drawPile.slice(-3).reverse();
         this.emitPrivateMessage(playerId, 'ek_alter_future', { cards: top3 });
-        const nextPlayer = this.state.players[this.getNextPlayerIndex(this.state.direction)];
+        const nextPlayer = this.state.players[this.getNextPlayerIndex(1)];
         if (nextPlayer) {
           this.emitPrivateMessage(nextPlayer.id, 'ek_see_future', { cards: top3 });
         }
@@ -755,7 +755,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
 
     this.state.pendingTurnsForCurrentPlayer--;
     if (this.state.pendingTurnsForCurrentPlayer <= 0) {
-      this.advanceTurn(this.state.direction, 1);
+      this.advanceTurn(1, 1);
     } else {
       this.resetTurnTimer();
       this.emitStateChange();
@@ -1004,7 +1004,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
   private finishTurnAfterSafeDraw(player: EKPlayer) {
     this.state.pendingTurnsForCurrentPlayer--;
     if (this.state.pendingTurnsForCurrentPlayer <= 0) {
-      this.advanceTurn(this.state.direction, 1);
+      this.advanceTurn(1, 1);
     } else {
       this.addLog(`${player.name} vẫn còn ${this.state.pendingTurnsForCurrentPlayer} lượt phải đánh!`, 'info', player.id);
       this.resetTurnTimer();
@@ -1111,7 +1111,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
     // Turn completes
     this.state.pendingTurnsForCurrentPlayer--;
     if (this.state.pendingTurnsForCurrentPlayer <= 0) {
-      this.advanceTurn(this.state.direction, 1);
+      this.advanceTurn(1, 1);
     } else {
       this.resetTurnTimer();
       this.emitStateChange();
@@ -1141,7 +1141,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
 
       this.state.pendingTurnsForCurrentPlayer--;
       if (this.state.pendingTurnsForCurrentPlayer <= 0) {
-        this.advanceTurn(this.state.direction, 1);
+        this.advanceTurn(1, 1);
       } else {
         this.resetTurnTimer();
         this.emitStateChange();
@@ -1177,7 +1177,7 @@ export class ExplodingKittensGame extends BaseGame<ExplodingKittensGameState, EK
 
     // Advance turn to next survivor
     this.state.pendingTurnsForCurrentPlayer = 1;
-    this.advanceTurn(this.state.direction, 1);
+    this.advanceTurn(1, 1);
   }
 
   private advanceTurn(step: number = 1, newPendingTurns: number = 1) {

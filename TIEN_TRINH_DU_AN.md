@@ -1,7 +1,13 @@
 # 📊 TIẾN ĐỘ DỰ ÁN OMNIDECK ARENA V2 (DASHBOARD, TIỀN TỆ, TÀI XỈU, MINES, GOALS)
 
 > **Cập nhật lúc:** 23/09/2026 (Giờ hệ thống)  
-> **Trạng thái tổng quan:** Đã hoàn thành **100%** + gói nâng cấp Navigation Panel & Slug Router. Server + Client build 0 lỗi, test 16/16 pass, mọi slug SPA (`/dashboard /play /room/:id /room-id /hustle /leaderboard /tai-xiu /mines /goals`) trả 200, `/api/health` → ok.
+> **Trạng thái tổng quan:** Đã hoàn thành **100%** + Fix lỗi lá Đảo Chiều (Reverse) khi còn 2 người chơi. Toàn bộ 18/18 Unit Test vượt qua (`npm test`). Server + Client build 0 lỗi.
+
+- [x] **Sửa lỗi lá Đảo Chiều (Reverse) khi còn 2 người chơi (Mèo Nổ & UNO)**:
+  - **Mèo Nổ (Exploding Kittens)**: Khắc phục lỗi truyền `this.state.direction` (-1) vào `advanceTurn` / `getNextPlayerIndex`, khiến vòng lặp `while (count < skipCount)` bị bỏ qua dẫn tới lượt chơi bị kẹt vĩnh viễn trên 1 người. Đã chuyển toàn bộ thành `advanceTurn(1, pendingTurns)`.
+  - **UNO**: Xóa bỏ cơ chế `advanceStep = 2` khi còn 2 người chơi (vốn biến lá Đảo Chiều thành lá Bỏ Lượt / Skip khiến người đánh được đi tiếp và rút/đánh bài liên tục). Giờ đây lá Đảo Chiều luôn đảo hướng và chuyển lượt sang đối thủ (`advanceStep = 1`).
+  - **BaseGame.ts**: Bổ sung cơ chế phòng thủ `Math.max(1, Math.abs(skipCount))` trong `getNextPlayerIndex` ngăn chặn triệt để mọi trường hợp kẹt lượt chơi nếu có tham số âm hoặc 0.
+
 
 ---
 

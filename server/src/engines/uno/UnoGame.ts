@@ -318,12 +318,8 @@ export class UnoGame extends BaseGame<UnoGameState, UnoAction, MaskedUnoGameStat
         break;
 
       case 'reverse':
-        if (this.state.players.filter(p => !p.eliminated).length === 2) {
-          advanceStep = 2; // In 2-player game, reverse acts as skip
-        } else {
-          this.state.direction = (this.state.direction * -1) as (1 | -1);
-          this.addLog(`Play direction reversed!`, 'special');
-        }
+        this.state.direction = (this.state.direction * -1) as (1 | -1);
+        this.addLog(`Play direction reversed!`, 'special');
         break;
 
       case 'draw_two':
@@ -387,14 +383,8 @@ export class UnoGame extends BaseGame<UnoGameState, UnoAction, MaskedUnoGameStat
         break;
 
       case 'wild_reverse_draw_four':
-        // Reverse direction first
-        if (this.state.players.filter(p => !p.eliminated).length === 2) {
-          // In 2-player game, reverse acts as skip - next player after reverse gets hit
-          this.addLog(`Reverse Draw 4! Direction reversed & +4 stacked!`, 'special');
-        } else {
-          this.state.direction = (this.state.direction * -1) as (1 | -1);
-          this.addLog(`Reverse Draw 4! Direction reversed & +4 stacked! Total: +${this.state.pendingDrawCount + 4}`, 'special');
-        }
+        this.state.direction = (this.state.direction * -1) as (1 | -1);
+        this.addLog(`Reverse Draw 4! Direction reversed & +4 stacked! Total: +${this.state.pendingDrawCount + 4}`, 'special');
         this.state.pendingDrawCount += 4;
         this.state.pendingDrawType = 'wild_reverse_draw_four';
         if (!this.state.rules.freeStacking) {

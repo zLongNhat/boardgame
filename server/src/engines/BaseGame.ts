@@ -137,9 +137,10 @@ export abstract class BaseGame<
     const activePlayers = this.state.players;
     const total = activePlayers.length;
     let index = this.state.currentTurnIndex;
+    const steps = Math.max(1, Math.abs(skipCount));
     let count = 0;
 
-    while (count < skipCount) {
+    while (count < steps) {
       index = (index + this.state.direction + total) % total;
       // Skip eliminated players if any
       if (!activePlayers[index].eliminated) {

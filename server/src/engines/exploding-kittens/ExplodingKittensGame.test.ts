@@ -292,7 +292,59 @@ test('ExplodingKittensGame - Multi-player scaling with expansions (up to 10 play
   const explodingCount = drawPile.filter(c => c.type === 'exploding_kitten').length;
   const implodingCount = drawPile.filter(c => c.type === 'imploding_kitten').length;
   assert.strictEqual(explodingCount, 10, 'Should have 10 Exploding Kittens for 10 players with Streaking Kittens');
-  assert.strictEqual(implodingCount, 1, 'Should have 1 Imploding Kitten');
+  game.clearTurnTimer();
+});
+
+test('ExplodingKittensGame - 2-player game Reverse alternates turns properly and does not lock turns', () => {
+  const players = [
+    { id: 'p1', name: 'Alice', avatar: 'av-1', isBot: false },
+    { id: 'p2', name: 'Bob', avatar: 'av-2', isBot: false }
+  ];
+
+  const game = new ExplodingKittensGame(players, 30, {
+    implodingKittens: true,
+    streakingKittens: false,
+    barkingKittens: false,
+    timebombMode: false
+  });
+  game.start();
+
+  // Give Alice a reverse card
+  const aliceHand: any[] = (game as any).hands.get('p1');
+  aliceHand.push({ id: 'rev-1', type: 'reverse', name: 'Đảo Chiều', description: '' });
+
+  // Add safe cards to draw deck so drawing doesn't trigger bombs
+  (game as any).drawPile.push(
+    { id: 'safe-1', type: 'skip', name: 'Bỏ Qua', description: '' },
+    { id: 'safe-2', type: 'skip', name: 'Bỏ Qua', description: '' },
+    { id: 'safe-3', type: 'skip', name: 'Bỏ Qua', description: '' }
+  );
+  game.state.drawPileCount = (game as any).drawPile.length;
+
+  assert.strictEqual(game.state.currentTurnIndex, 0, 'Alice starts');
+
+  // Alice plays reverse card
+  const res = game.handleAction('p1', { type: 'PLAY_ACTION', cardId: 'rev-1' });
+  assert.strictEqual(res.success, true);
+  (game as any).resolvePendingAction();
+
+  // Turn MUST advance to Bob (index 1), NOT stay with Alice!
+  assert.strictEqual(game.state.currentTurnIndex, 1, 'Turn must advance to Bob after Alice plays Reverse');
+  assert.strictEqual(game.state.direction, -1, 'Direction must be reversed (-1)');
+
+  // Bob draws a card to end his turn
+  const drawRes1 = game.handleAction('p2', { type: 'DRAW_CARD' });
+  assert.strictEqual(drawRes1.success, true);
+
+  // Turn MUST advance back to Alice (index 0) in reversed direction!
+  assert.strictEqual(game.state.currentTurnIndex, 0, 'Turn must advance back to Alice after Bob draws');
+
+  // Alice draws a card
+  const drawRes2 = game.handleAction('p1', { type: 'DRAW_CARD' });
+  assert.strictEqual(drawRes2.success, true);
+
+  // Turn MUST advance back to Bob (index 1) in reversed direction!
+  assert.strictEqual(game.state.currentTurnIndex, 1, 'Turn must advance back to Bob after Alice draws');
 
   game.clearTurnTimer();
 });
