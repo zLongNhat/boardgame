@@ -49,7 +49,7 @@ export class WorkManager {
   private userManager: UserManager;
   private pendingChallenges: Map<string, PendingChallenge> = new Map(); // userId -> challenge
   private lastCompletedAt: Map<string, number> = new Map(); // userId -> timestamp
-  private readonly COOLDOWN_MS = 5000; // 5 seconds
+  private readonly COOLDOWN_MS = 3000; // 3 seconds
   private readonly EXPIRY_MS = 15000; // 15 seconds to type
   private readonly REWARD = 10; // coins per successful work
 

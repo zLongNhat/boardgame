@@ -216,8 +216,8 @@ export const WorkView: React.FC<WorkViewProps> = ({ user, socket, onBack, onBala
       setTimeout(() => {
         setResult(null);
         setMessage('');
-        // We simulate a basic 5s cooldown from server
-        setCooldownUntil(Date.now() + 5000);
+        // 3s cooldown from server
+        setCooldownUntil(Date.now() + 3000);
       }, 1500);
     });
   }, [socket, onBalanceUpdate, user, onOpenAuth]);
@@ -232,7 +232,7 @@ export const WorkView: React.FC<WorkViewProps> = ({ user, socket, onBack, onBala
     setTimeout(() => {
       setResult(null);
       setMessage('');
-      setCooldownUntil(Date.now() + 5000);
+      setCooldownUntil(Date.now() + 3000);
     }, 1500);
   }, []);
 
@@ -362,7 +362,7 @@ export const WorkView: React.FC<WorkViewProps> = ({ user, socket, onBack, onBala
                     <motion.div 
                       className="h-full bg-blue-500 rounded-full"
                       initial={{ width: '100%' }}
-                      animate={{ width: `${(cooldownLeft / 5000) * 100}%` }}
+                      animate={{ width: `${(cooldownLeft / 3000) * 100}%` }}
                       transition={{ duration: 0.1, ease: 'linear' }}
                     />
                   </div>

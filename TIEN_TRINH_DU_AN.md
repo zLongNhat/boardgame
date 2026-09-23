@@ -12,6 +12,10 @@
   - Tất cả các lá cộng (+2, +4, +6, +8, +10, wild reverse 4) đều có thể cộng dồn lên nhau:
     - **Lá Wild (Đen)**: Có thể cộng dồn đè lên bất kỳ lá phạt nào.
     - **Lá màu (+2, +4 có màu)**: Chỉ cần cùng màu với màu đang hiện hành (`activeColor`) hoặc cùng loại lá cộng là được phép dồn tiếp (ví dụ: Wild +8 đổi sang Đỏ thì có thể dồn tiếp +2 Đỏ, +4 Đỏ, hoặc các lá Wild khác).
+- [x] **Tối ưu Trung Tâm Làm Việc (Work Center)**:
+  - Rút ngắn thời gian nghỉ ngơi giữa 2 lượt làm việc từ **5s xuống 3s** (cả Server `COOLDOWN_MS = 3000` và Client thanh đếm ngược / tự động phát từ mới).
+  - Tự động duy trì con trỏ gõ phím (`focus`) liên tục mà không cần click lại vào ô nhập.
+
 
 
 
