@@ -3,6 +3,21 @@
 > **Cập nhật lúc:** 23/09/2026 (Giờ hệ thống)  
 > **Trạng thái tổng quan:** Đã hoàn thành **100%** + Fix lỗi lá Đảo Chiều (Reverse) khi còn 2 người chơi. Toàn bộ 18/18 Unit Test vượt qua (`npm test`). Server + Client build 0 lỗi.
 
+- [x] **Trừ tiền cược phòng trước khi chơi & Trả thưởng người thắng gấp 15–30 lần**:
+  - **Trừ cược ngay khi vào/tạo phòng**: 
+    - Khi chủ phòng tạo phòng, hệ thống kiểm tra và trừ tiền cược `betAmount` ngay lập tức nếu là tài khoản đăng nhập.
+    - Khi người chơi tham gia phòng (`join_room`), hệ thống kiểm tra số dư và trừ tiền cược ngay trước khi cho phép vào phòng; nếu không đủ tiền sẽ từ chối và thông báo cụ thể.
+    - Hiển thị huy hiệu `Đã cược: X 🪙` trực tiếp trên thẻ người chơi trong danh sách phòng chờ.
+  - **Cơ chế hoàn trả (Refund) công bằng**:
+    - Nếu người chơi rời phòng hoặc bị chủ phòng đuổi (kick) trước khi trận đấu bắt đầu, toàn bộ tiền cược được hoàn trả lại ngay lập tức vào số dư.
+    - Nếu phòng bị giải tán trước khi bắt đầu, hoàn tiền cho tất cả người chơi còn lại đã nộp cược.
+  - **Trả thưởng chiến thắng gấp 15 - 30 lần**:
+    - Khi ván đấu kết thúc (`onGameOver`), hệ thống quay ngẫu nhiên hệ số thưởng từ **15x đến 30x** mức cược phòng.
+    - Cộng thưởng cho (các) người chiến thắng đã đăng nhập (bỏ qua bot/khách).
+    - Thông báo chiến thắng và số tiền thưởng x15–x30 nổi bật trên hệ thống chat và cập nhật bảng xếp hạng.
+  - **Đồng bộ số dư Real-time**:
+    - Server phát sự kiện `balance_updated` đến socket của người chơi ngay khi trừ tiền, hoàn tiền, nhận thưởng.
+    - Client bắt sự kiện và cập nhật trực tiếp `user.balance` trên thanh Header mà không cần tải lại trang.
 - [x] **Sửa lỗi lá Đảo Chiều (Reverse) khi còn 2 người chơi (Mèo Nổ & UNO)**:
   - **Mèo Nổ (Exploding Kittens)**: Khắc phục lỗi truyền `this.state.direction` (-1) vào `advanceTurn` / `getNextPlayerIndex`, khiến vòng lặp `while (count < skipCount)` bị bỏ qua dẫn tới lượt chơi bị kẹt vĩnh viễn trên 1 người. Đã chuyển toàn bộ thành `advanceTurn(1, pendingTurns)`.
   - **UNO**: Xóa bỏ cơ chế `advanceStep = 2` khi còn 2 người chơi (vốn biến lá Đảo Chiều thành lá Bỏ Lượt / Skip khiến người đánh được đi tiếp và rút/đánh bài liên tục). Giờ đây lá Đảo Chiều luôn đảo hướng và chuyển lượt sang đối thủ (`advanceStep = 1`).
