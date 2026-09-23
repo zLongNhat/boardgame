@@ -11,6 +11,7 @@ import { MinesEngine } from './engines/mines/MinesEngine';
 import { GoalsEngine } from './engines/goals/GoalsEngine';
 import { CasinoEngine } from './engines/casino/CasinoEngine';
 import { registerSocketHandlers } from './sockets/gameHandlers';
+import { flushRemoteSaves } from './storage/redisRest';
 
 const app = express();
 const server = http.createServer(app);
@@ -34,9 +35,6 @@ const goalsEngine = new GoalsEngine(userManager);
 const casinoEngine = new CasinoEngine(userManager);
 
 registerSocketHandlers(io, roomManager, userManager, workManager, taiXiuEngine, minesEngine, goalsEngine, casinoEngine);
-
-// Start the Tai Xiu auto-running engine
-taiXiuEngine.start();
 
 // Start Aviator shared rounds
 casinoEngine.aviatorStart();
@@ -150,7 +148,31 @@ app.get('*', (_req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`[OmniDeck Server] Running on http://localhost:${PORT}`);
-  console.log(`[TaiXiu] Auto-running engine started.`);
+
+async function bootstrap() {
+  // Restore player data from Redis (if configured) BEFORE accepting traffic
+  await userManager.initRemote();
+  await taiXiuEngine.initRemote();
+
+  // Start the Tai Xiu auto-running engine
+  taiXiuEngine.start();
+
+  server.listen(PORT, () => {
+    console.log(`[OmniDeck Server] Running on http://localhost:${PORT}`);
+    console.log(`[TaiXiu] Auto-running engine started.`);
+  });
+}
+
+bootstrap().catch(err => {
+  console.error('[OmniDeck] Fatal boot error:', err);
+  process.exit(1);
 });
+
+// Flush pending debounced saves to Redis before Render stops the instance
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.on(signal, async () => {
+    console.log(`[OmniDeck] ${signal} received — flushing remote saves...`);
+    await flushRemoteSaves();
+    process.exit(0);
+  });
+}

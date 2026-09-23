@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { PERSISTED_KEYS, redisConfigured, redisGet, scheduleRemoteSave } from '../storage/redisRest';
 
 export interface UserStats {
   unoWins: number;
@@ -47,6 +48,51 @@ export class UserManager {
     this.ensureDataDir();
     this.loadUsers();
     this.loadSessions();
+  }
+
+  /**
+   * Pull authoritative state from Upstash Redis on boot (if configured).
+   * Redis wins over the local file (files are ephemeral on Render);
+   * on first boot (key missing) the current seeds are pushed up instead.
+   */
+  public async initRemote(): Promise<void> {
+    if (!redisConfigured()) {
+      console.log('[UserManager] Redis not configured — persisting to local files only.');
+      return;
+    }
+    try {
+      const rawUsers = await redisGet(PERSISTED_KEYS.KEY_USERS);
+      if (rawUsers) {
+        const data: User[] = JSON.parse(rawUsers); // parse before mutating state
+        this.users.clear();
+        this.usernameIndex.clear();
+        for (const u of data) {
+          this.users.set(u.id, u);
+          this.usernameIndex.set(u.username.toLowerCase(), u.id);
+        }
+        console.log(`[UserManager] Loaded ${data.length} users from Redis.`);
+      }
+
+      const rawSessions = await redisGet(PERSISTED_KEYS.KEY_SESSIONS);
+      if (rawSessions) {
+        const data: Record<string, { userId: string; expiresAt: number }> = JSON.parse(rawSessions);
+        const restored = new Map<string, { userId: string; expiresAt: number }>();
+        const now = Date.now();
+        for (const [token, s] of Object.entries(data)) {
+          if (s && s.userId && s.expiresAt > now && this.users.has(s.userId)) {
+            restored.set(token, s);
+          }
+        }
+        this.tokenToUserIdMap = restored;
+        console.log(`[UserManager] Restored ${restored.size} sessions from Redis.`);
+      }
+
+      // Keep the local file cache in sync with the authoritative state
+      this.saveUsers();
+      this.saveSessions();
+    } catch (err) {
+      console.warn('[UserManager] Redis init failed, keeping local/file state:', err instanceof Error ? err.message : err);
+    }
   }
 
   private ensureDataDir() {
@@ -107,6 +153,11 @@ export class UserManager {
         obj[token] = s;
       }
       fs.writeFileSync(this.sessionsFilePath, JSON.stringify(obj, null, 2), 'utf-8');
+      scheduleRemoteSave(PERSISTED_KEYS.KEY_SESSIONS, () => {
+        const fresh: Record<string, { userId: string; expiresAt: number }> = {};
+        for (const [token, s] of this.tokenToUserIdMap) fresh[token] = s;
+        return JSON.stringify(fresh);
+      });
     } catch (err) {
       console.error('[UserManager] Error saving sessions:', err);
     }
@@ -117,6 +168,10 @@ export class UserManager {
       this.ensureDataDir();
       const list = Array.from(this.users.values());
       fs.writeFileSync(this.dataFilePath, JSON.stringify(list, null, 2), 'utf-8');
+      scheduleRemoteSave(
+        PERSISTED_KEYS.KEY_USERS,
+        () => JSON.stringify(Array.from(this.users.values()))
+      );
     } catch (err) {
       console.error('[UserManager] Error saving users:', err);
     }

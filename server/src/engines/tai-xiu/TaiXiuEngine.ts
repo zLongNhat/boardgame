@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { EventEmitter } from 'events';
 import { UserManager } from '../../auth/UserManager';
+import { PERSISTED_KEYS, redisConfigured, redisGet, scheduleRemoteSave } from '../../storage/redisRest';
 import {
   TaiXiuPhase,
   TaiXiuBetType,
@@ -74,8 +75,32 @@ export class TaiXiuEngine extends EventEmitter {
       const dir = path.dirname(this.jackpotFilePath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(this.jackpotFilePath, JSON.stringify({ pool: this.jackpotPool, lastJackpot: this.lastJackpot }, null, 2), 'utf-8');
+      scheduleRemoteSave(
+        PERSISTED_KEYS.KEY_TAIXIU_JACKPOT,
+        () => JSON.stringify({ pool: this.jackpotPool, lastJackpot: this.lastJackpot })
+      );
     } catch {
       // Bỏ qua lỗi ghi file, hũ vẫn giữ trong RAM
+    }
+  }
+
+  /** Pull jackpot from Upstash Redis on boot (if configured); first boot pushes local value up. */
+  public async initRemote(): Promise<void> {
+    if (!redisConfigured()) return;
+    try {
+      const raw = await redisGet(PERSISTED_KEYS.KEY_TAIXIU_JACKPOT);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (typeof data.pool === 'number' && data.pool >= 0) this.jackpotPool = Math.floor(data.pool);
+        if (data.lastJackpot) this.lastJackpot = data.lastJackpot;
+        console.log(`[TaiXiu] Jackpot restored from Redis: ${this.jackpotPool} coins.`);
+        this.saveJackpot(); // sync local file cache
+      } else {
+        // First boot: seed Redis with the current pool
+        this.saveJackpot();
+      }
+    } catch (err) {
+      console.warn('[TaiXiu] Redis jackpot init failed:', err instanceof Error ? err.message : err);
     }
   }
 
