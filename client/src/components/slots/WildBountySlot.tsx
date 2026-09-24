@@ -280,6 +280,7 @@ export const WildBountySlot: React.FC = () => {
   // Top-to-Bottom Sequential Reel Rolling & Scatter Drop states
   const [spinningCols, setSpinningCols] = useState<boolean[]>([false, false, false, false, false, false]);
   const [targetColumnTiles, setTargetColumnTiles] = useState<SlotTile[][] | null>(null);
+  const [cascadeDropCounts, setCascadeDropCounts] = useState<number[]>([0, 0, 0, 0, 0, 0]);
   const [anticipatingCols, setAnticipatingCols] = useState<number[]>([]);
   const [landedScattersCount, setLandedScattersCount] = useState(0);
   const [reelSpinDurations, setReelSpinDurations] = useState<number[]>([380, 380, 380, 380, 380, 380]);
@@ -468,7 +469,7 @@ export const WildBountySlot: React.FC = () => {
     );
   };
 
-  // Play through cascading steps with authentic PG Soft shatter & drop animations
+  // Play through cascading steps with authentic PG Soft shatter & continuous strip drop animations
   const animateCascades = async (spinResult: SpinResult) => {
     const cascades = spinResult.cascades;
 
@@ -485,7 +486,7 @@ export const WildBountySlot: React.FC = () => {
         setLastWinAmount(step.totalWinSoFar);
         await new Promise(r => setTimeout(r, turbo ? 200 : 420));
 
-        // Phase 2: Gunshot impact strike & items shatter into glass fragments!
+        // Phase 2: Gunshot impact strike & non-gold winning items shatter into glass fragments & vanish
         setTileAnimationPhase('shattering');
         setIsScreenShaking(true);
         soundFX.playGunshot();
@@ -497,12 +498,29 @@ export const WildBountySlot: React.FC = () => {
         }
 
         setTimeout(() => setIsScreenShaking(false), 240);
-        await new Promise(r => setTimeout(r, turbo ? 260 : 480));
+        // Wait for shatter explode animation (0.45s) to finish scaling down to 0
+        await new Promise(r => setTimeout(r, turbo ? 260 : 460));
 
-        // Phase 3: Surviving tiles & new symbols drop with spring bounce
-        setTileAnimationPhase('dropped');
-        soundFX.playDrop();
-        await new Promise(r => setTimeout(r, turbo ? 180 : 320));
+        // Phase 3: Physical continuous strip sliding drop from top
+        // If there is a next step, drop only the columns that had vanished items
+        const nextStep = cascades[i + 1];
+        if (nextStep) {
+          // Calculate how many non-gold winning tiles vanished in each column
+          const drops = step.grid.map(col =>
+            col.filter(t => t.isWinning && !t.isGold).length
+          );
+
+          // Update grid to next step and trigger real physical translateY drop
+          setCurrentGrid(nextStep.grid);
+          setCascadeDropCounts(drops);
+          setTileAnimationPhase('idle');
+          soundFX.playDrop();
+
+          // Wait for physical slide down and elastic bounce (360ms)
+          await new Promise(r => setTimeout(r, turbo ? 200 : 380));
+          // Reset drop counts so next cascade step can trigger fresh
+          setCascadeDropCounts([0, 0, 0, 0, 0, 0]);
+        }
       } else {
         setTileAnimationPhase('idle');
         await new Promise(r => setTimeout(r, turbo ? 140 : 250));
@@ -510,6 +528,7 @@ export const WildBountySlot: React.FC = () => {
     }
 
     setTileAnimationPhase('idle');
+    setCascadeDropCounts([0, 0, 0, 0, 0, 0]);
 
     // Finalize spin
     setLastWinAmount(spinResult.totalWin);
@@ -706,6 +725,7 @@ export const WildBountySlot: React.FC = () => {
                 spinDuration={reelSpinDurations[colIdx] || 380}
                 isAnticipating={anticipatingCols.includes(colIdx)}
                 animationPhase={tileAnimationPhase}
+                cascadeDropCount={cascadeDropCounts[colIdx]}
               />
             ))}
           </div>

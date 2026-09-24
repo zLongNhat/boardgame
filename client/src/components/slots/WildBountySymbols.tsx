@@ -118,7 +118,6 @@ export const WildBountyTile: React.FC<SymbolProps> = ({
   const isConnecting = isWinning && (animationPhase === 'connecting' || animationPhase === 'idle');
   const isShattering = isWinning && animationPhase === 'shattering';
   const isGoldMorphing = (isGold && isShattering) || animationPhase === 'gold-morph' || transformedToWild;
-  const isDropped = animationPhase === 'dropped';
 
   return (
     <div
@@ -134,7 +133,7 @@ export const WildBountyTile: React.FC<SymbolProps> = ({
           : isGold
           ? 'border-yellow-400 shadow-[0_0_14px_rgba(234,179,8,0.7)] ring-1 ring-yellow-300/80'
           : details.borderColor
-      } ${isDropped ? 'animate-slot-drop' : ''} transition-all duration-200`}
+      } transition-all duration-200`}
     >
       {/* Gold Frame Ornate Rim */}
       {isGold && (

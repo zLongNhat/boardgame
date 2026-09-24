@@ -10,6 +10,7 @@ interface ReelColumnViewProps {
   spinDuration: number;
   isAnticipating?: boolean;
   animationPhase: TileAnimationPhase;
+  cascadeDropCount?: number; // Number of tiles dropped from top during cascade
   onReelStop?: (colIdx: number) => void;
 }
 
@@ -42,6 +43,7 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
   spinDuration,
   isAnticipating,
   animationPhase,
+  cascadeDropCount = 0,
   onReelStop
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,19 +54,20 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
   const [hasLanded, setHasLanded] = useState(false);
   const stoppedRef = useRef(false);
 
+  // 1. Initial spin roll logic (when isSpinning === true)
   useEffect(() => {
     if (!isSpinning) {
-      // Idle or stopped state: update prevTiles to current visibleTiles
-      prevTilesRef.current = visibleTiles;
-      setTapeTiles(visibleTiles);
-      setOffsetY(0);
-      setIsRolling(false);
-      setHasLanded(false);
-      stoppedRef.current = true;
+      if (!cascadeDropCount) {
+        prevTilesRef.current = visibleTiles;
+        setTapeTiles(visibleTiles);
+        setOffsetY(0);
+        setIsRolling(false);
+        setHasLanded(false);
+        stoppedRef.current = true;
+      }
       return;
     }
 
-    // When spin begins for this column
     stoppedRef.current = false;
     setHasLanded(false);
 
@@ -73,7 +76,6 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
       : visibleTiles;
     const targetTiles = visibleTiles;
 
-    // 12 dummy symbols between target tiles (at top) and prev tiles (at bottom)
     const dummyCount = 12;
     const dummyTiles: SlotTile[] = [];
     for (let i = 0; i < dummyCount; i++) {
@@ -85,10 +87,6 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
       });
     }
 
-    // Strip layout: [targetTiles (0..height-1), ...dummyTiles, ...prevTiles]
-    // - At translateY = -((height + dummyCount) * step), the viewport shows prevTiles!
-    // - As it translates down to 0, dummyTiles scroll through, then targetTiles roll into view.
-    // - At translateY = 0, the viewport displays EXACTLY targetTiles!
     const strip: SlotTile[] = [
       ...targetTiles,
       ...dummyTiles,
@@ -97,16 +95,13 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
 
     setTapeTiles(strip);
 
-    // Calculate step height dynamically from container
     const clientH = containerRef.current?.clientHeight || 0;
     const step = clientH > 0 ? clientH / height : 82;
     const startOffset = -((height + dummyCount) * step);
 
-    // Set initial position at startOffset with transition disabled
     setOffsetY(startOffset);
     setIsRolling(false);
 
-    // Start rolling down on next render frame
     const rafId1 = requestAnimationFrame(() => {
       const rafId2 = requestAnimationFrame(() => {
         setIsRolling(true);
@@ -115,7 +110,6 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
       return () => cancelAnimationFrame(rafId2);
     });
 
-    // Landing timer when reel roll finishes
     const stopTimer = setTimeout(() => {
       setIsRolling(false);
       setHasLanded(true);
@@ -131,7 +125,46 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
       cancelAnimationFrame(rafId1);
       clearTimeout(stopTimer);
     };
-  }, [isSpinning, spinDuration, visibleTiles, colIdx, height, onReelStop]);
+  }, [isSpinning, spinDuration, visibleTiles, colIdx, height, onReelStop, cascadeDropCount]);
+
+  // 2. Cascade Drop logic: continuous strip sliding down from top when tiles shatter
+  useEffect(() => {
+    if (cascadeDropCount > 0 && !isSpinning) {
+      const clientH = containerRef.current?.clientHeight || 0;
+      const step = clientH > 0 ? clientH / height : 82;
+      const startOffset = -(cascadeDropCount * step);
+
+      // Current visibleTiles already contains new top tiles + dropped survivors
+      setTapeTiles(visibleTiles);
+      setOffsetY(startOffset);
+      setIsRolling(false);
+      setHasLanded(false);
+
+      const rafId1 = requestAnimationFrame(() => {
+        const rafId2 = requestAnimationFrame(() => {
+          setIsRolling(true);
+          setOffsetY(0);
+        });
+        return () => cancelAnimationFrame(rafId2);
+      });
+
+      const landTimer = setTimeout(() => {
+        setIsRolling(false);
+        setHasLanded(true);
+        prevTilesRef.current = visibleTiles;
+      }, 340);
+
+      const bounceClearTimer = setTimeout(() => {
+        setHasLanded(false);
+      }, 550);
+
+      return () => {
+        cancelAnimationFrame(rafId1);
+        clearTimeout(landTimer);
+        clearTimeout(bounceClearTimer);
+      };
+    }
+  }, [cascadeDropCount, isSpinning, visibleTiles, height]);
 
   return (
     <div
@@ -143,7 +176,6 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
           : 'bg-black/40 border-amber-900/30'
       }`}
       style={{
-        // Height matches exact number of visible tiles so all cells are uniform
         maxHeight: `${height * 88 + 8}px`
       }}
     >
@@ -165,14 +197,16 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
         style={{
           transform: `translateY(${offsetY}px)`,
           transition: isRolling
-            ? `transform ${spinDuration}ms cubic-bezier(0.12, 0.85, 0.28, 1)`
+            ? `transform ${isSpinning ? spinDuration : 340}ms cubic-bezier(${
+                isSpinning ? '0.12, 0.85, 0.28, 1' : '0.22, 1, 0.36, 1.15'
+              })`
             : 'none'
         }}
         className={`flex flex-col gap-1.5 sm:gap-2 justify-center ${
           hasLanded ? 'animate-reel-bounce' : ''
         }`}
       >
-        {(isSpinning || isRolling ? tapeTiles : visibleTiles).map(tile => (
+        {(isSpinning || isRolling || cascadeDropCount > 0 ? tapeTiles : visibleTiles).map(tile => (
           <div key={tile.id} className="w-full flex-shrink-0">
             <WildBountyTile
               symbol={tile.symbol}
