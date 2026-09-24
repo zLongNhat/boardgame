@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Package, Sparkles, Coins, ShieldCheck, RefreshCw, ChevronRight, Layers } from 'lucide-react';
+import { Package, Sparkles, ShieldCheck, RefreshCw, ChevronRight, Layers } from 'lucide-react';
 import { CaseDefinition, CaseItemTemplate, InventoryItem, ItemRarity } from '../../types/game';
 import { useAuth } from '../../context/AuthContext';
 import { useGameSocketContext } from '../../hooks/GameSocketContext';
@@ -193,35 +193,7 @@ export const CaseOpeningView: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto flex flex-col gap-8 pb-12">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-amber-600/20 via-purple-600/20 to-indigo-600/20 border border-amber-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-md relative overflow-hidden shadow-2xl">
-        <div className="absolute -top-12 -right-12 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold mb-3 uppercase tracking-wider">
-              <Package className="w-3.5 h-3.5" /> CS2 Case Opening • Tự Cân Bằng RTP 95%
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-300">
-              Mở Hòm Vũ Khí CS2
-            </h1>
-            <p className="text-sm text-gray-300 mt-2 max-w-xl">
-              Quay roulette hòm đồ phong cách CS2. Phần thưởng là các skin giá trị quy đổi trực tiếp thành tiền 🪙, tự cân bằng theo các hạng Trắng, Xanh, Tím, Đỏ, Vàng.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="bg-gray-900/80 border border-gray-700/60 rounded-2xl px-5 py-3 flex items-center gap-3 shadow-inner">
-              <Coins className="w-6 h-6 text-yellow-400" />
-              <div>
-                <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Số dư của bạn</div>
-                <div className="text-xl font-black text-yellow-400">{user?.balance?.toLocaleString('vi-VN') || 0} 🪙</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div className="max-w-6xl mx-auto flex flex-col gap-6 pb-12">
       {/* 3 Case Selector Tabs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {cases.map((c) => {

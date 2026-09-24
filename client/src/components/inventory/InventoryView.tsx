@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Coins, ArrowUpRight, Trash2, Filter, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
+import { Coins, ArrowUpRight, Trash2, Filter, Sparkles, AlertCircle, CheckCircle } from 'lucide-react';
 import { InventoryItem } from '../../types/game';
 import { useAuth } from '../../context/AuthContext';
 import { useGameSocketContext } from '../../hooks/GameSocketContext';
@@ -85,46 +85,7 @@ export const InventoryView: React.FC = () => {
     });
 
   return (
-    <div className="max-w-6xl mx-auto flex flex-col gap-8 pb-12">
-      {/* Header Info Banner */}
-      <div className="bg-gradient-to-r from-indigo-900/40 via-purple-900/40 to-slate-900/40 border border-indigo-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-md relative overflow-hidden shadow-2xl">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-bold mb-3 uppercase tracking-wider">
-              <Package className="w-3.5 h-3.5" /> Kho Đồ Cá Nhân (Inventory)
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-white">
-              Bộ Sưu Tập Skin Vũ Khí
-            </h1>
-            <p className="text-sm text-gray-300 mt-2 max-w-xl">
-              Nơi lưu trữ các item nhận được từ Mở Hòm CS2. Bạn có thể bán ngay lấy tiền coins hoặc mang sang trò Nâng Cấp để thử vận may nhân hệ số!
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="bg-gray-900/80 border border-gray-700/60 rounded-2xl px-5 py-3 shadow-inner">
-              <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Tổng số vật phẩm</div>
-              <div className="text-xl font-black text-white">{items.length} món</div>
-            </div>
-
-            <div className="bg-gray-900/80 border border-gray-700/60 rounded-2xl px-5 py-3 shadow-inner">
-              <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Tổng giá trị quy đổi</div>
-              <div className="text-xl font-black text-yellow-400">{totalValue.toLocaleString('vi-VN')} 🪙</div>
-            </div>
-
-            {items.length > 0 && (
-              <button
-                disabled={isSellingAll}
-                onClick={handleSellAll}
-                className="px-5 py-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs flex items-center gap-2 transition-all shadow-lg shadow-red-600/20 cursor-pointer"
-              >
-                <Trash2 className="w-4 h-4" /> Bán Tất Cả (+{totalValue.toLocaleString('vi-VN')} 🪙)
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
+    <div className="max-w-6xl mx-auto flex flex-col gap-6 pb-12">
       {/* Notification Toast */}
       {actionMsg && (
         <div
@@ -167,17 +128,35 @@ export const InventoryView: React.FC = () => {
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 font-bold">Sắp xếp:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-gray-800 border border-gray-700 text-xs text-gray-200 rounded-xl px-3 py-1.5 font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
-          >
-            <option value="newest">Mới nhất</option>
-            <option value="value_desc">Giá trị: Cao &rarr; Thấp</option>
-            <option value="value_asc">Giá trị: Thấp &rarr; Cao</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 font-bold">Sắp xếp:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-gray-800 border border-gray-700 text-xs text-gray-200 rounded-xl px-3 py-1.5 font-bold focus:outline-none focus:border-indigo-500 cursor-pointer"
+            >
+              <option value="newest">Mới nhất</option>
+              <option value="value_desc">Giá trị: Cao &rarr; Thấp</option>
+              <option value="value_asc">Giá trị: Thấp &rarr; Cao</option>
+            </select>
+          </div>
+
+          <div className="h-5 w-px bg-gray-700 hidden sm:block" />
+
+          <div className="text-xs font-bold text-gray-300">
+            <span>{items.length} món</span> • <span className="text-yellow-400 font-black">{totalValue.toLocaleString('vi-VN')} 🪙</span>
+          </div>
+
+          {items.length > 0 && (
+            <button
+              disabled={isSellingAll}
+              onClick={handleSellAll}
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-red-600/20 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Bán Tất Cả
+            </button>
+          )}
         </div>
       </div>
 

@@ -176,31 +176,7 @@ export const UpgradeView: React.FC = () => {
   const strokeDashoffset = rollDirection === 'under' ? 0 : -((100 - winChance) / 100) * circumference;
 
   return (
-    <div className="max-w-6xl mx-auto flex flex-col gap-8 pb-12">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-purple-900/40 via-indigo-900/40 to-slate-900/40 border border-purple-500/30 rounded-3xl p-6 sm:p-8 backdrop-blur-md relative overflow-hidden shadow-2xl">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative z-10">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-bold mb-3 uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5" /> SkinClub Style Upgrade • Minh Bạch RTP 95%
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-indigo-300 to-pink-400">
-              Nâng Cấp Vật Phẩm & Tiền Thưởng
-            </h1>
-            <p className="text-sm text-gray-300 mt-2 max-w-xl">
-              Cược tiền xu hoặc dùng skin trong kho đồ để nâng cấp lên các mốc tiền thưởng cao hơn. Tùy chỉnh thanh trượt hệ số nhân để tính toán chính xác tỉ lệ trúng thưởng!
-            </p>
-          </div>
-
-          <div className="bg-gray-900/80 border border-gray-700/60 rounded-2xl px-5 py-3 flex items-center gap-3 shadow-inner">
-            <Coins className="w-6 h-6 text-yellow-400" />
-            <div>
-              <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Số dư của bạn</div>
-              <div className="text-xl font-black text-yellow-400">{user?.balance?.toLocaleString('vi-VN') || 0} 🪙</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="max-w-6xl mx-auto flex flex-col gap-6 pb-12">
 
       {errorMsg && (
         <div className="p-4 rounded-2xl bg-red-950/80 border border-red-500/50 text-red-300 text-sm font-bold flex items-center gap-2">
