@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useGameSocketContext } from '../../hooks/GameSocketContext';
-import { CascadeStep, FreeSpinsState, SpinResult } from '../../types/game';
+import { CascadeStep, FreeSpinsState, SpinResult, SlotTile } from '../../types/game';
 import { TileAnimationPhase } from './WildBountySymbols';
 import { ReelColumnView } from './ReelColumnView';
 
@@ -277,26 +277,30 @@ export const WildBountySlot: React.FC = () => {
   const [tileAnimationPhase, setTileAnimationPhase] = useState<TileAnimationPhase>('idle');
   const [isScreenShaking, setIsScreenShaking] = useState(false);
 
-  // Top-to-Bottom Reel Rolling & Scatter Drop states
-  const [isReelsRolling, setIsReelsRolling] = useState(false);
+  // Top-to-Bottom Sequential Reel Rolling & Scatter Drop states
+  const [spinningCols, setSpinningCols] = useState<boolean[]>([false, false, false, false, false, false]);
+  const [targetColumnTiles, setTargetColumnTiles] = useState<SlotTile[][] | null>(null);
   const [anticipatingCols, setAnticipatingCols] = useState<number[]>([]);
   const [landedScattersCount, setLandedScattersCount] = useState(0);
-  const [reelSpinDurations, setReelSpinDurations] = useState<number[]>([500, 750, 1000, 1250, 1500, 1750]);
+  const [reelSpinDurations, setReelSpinDurations] = useState<number[]>([380, 380, 380, 380, 380, 380]);
 
   const pendingSpinResultRef = useRef<SpinResult | null>(null);
   const scattersCountRef = useRef(0);
-  const stoppedCountRef = useRef(0);
+  const anticipatingColsRef = useRef<number[]>([]);
 
-  // Staggered reel landing handler
-  const handleReelStop = (colIdx: number) => {
+  // Reel landing handler for an individual column
+  const handleReelLanded = (colIdx: number, targetGrid: SlotTile[][]) => {
     soundFX.playReelClack(colIdx);
-    stoppedCountRef.current++;
 
-    const result = pendingSpinResultRef.current;
-    if (!result) return;
+    // Persist target tiles into currentGrid for this column
+    setCurrentGrid(prev => {
+      const next = [...prev];
+      next[colIdx] = targetGrid[colIdx];
+      return next;
+    });
 
     // Check if any scatter landed on this stopped column
-    const scattersInThisCol = result.cascades[0].grid[colIdx].filter(t => t.symbol === 'scatter').length;
+    const scattersInThisCol = targetGrid[colIdx].filter(t => t.symbol === 'scatter').length;
     if (scattersInThisCol > 0) {
       scattersCountRef.current += scattersInThisCol;
       setLandedScattersCount(scattersCountRef.current);
@@ -306,18 +310,83 @@ export const WildBountySlot: React.FC = () => {
       if (scattersCountRef.current >= 2 && colIdx < 5) {
         const remaining = Array.from({ length: 5 - colIdx }, (_, i) => colIdx + 1 + i);
         setAnticipatingCols(remaining);
+        anticipatingColsRef.current = remaining;
         soundFX.playAnticipation();
       }
     }
+  };
 
-    // When all 6 reels have landed
-    if (stoppedCountRef.current >= 6) {
-      setTimeout(() => {
-        setIsReelsRolling(false);
-        setAnticipatingCols([]);
-        animateCascades(result);
-      }, turbo ? 80 : 220);
+  // Run sequential reel-by-reel spin animation
+  const runSpinSequence = async (spinResult: SpinResult) => {
+    const targetGrid = spinResult.cascades[0].grid;
+    setTargetColumnTiles(targetGrid);
+
+    if (turbo) {
+      // In Turbo mode: rapid sequential (120ms each)
+      for (let c = 0; c < 6; c++) {
+        setReelSpinDurations(prev => {
+          const next = [...prev];
+          next[c] = 160;
+          return next;
+        });
+        setSpinningCols(prev => {
+          const next = [...prev];
+          next[c] = true;
+          return next;
+        });
+
+        await new Promise(r => setTimeout(r, 120));
+
+        setSpinningCols(prev => {
+          const next = [...prev];
+          next[c] = false;
+          return next;
+        });
+        handleReelLanded(c, targetGrid);
+      }
+    } else {
+      // In Normal mode: "từng cột quay một chứ không phải như hiện tại"
+      // Column 0 -> Column 1 -> Column 2 -> Column 3 -> Column 4 -> Column 5
+      for (let c = 0; c < 6; c++) {
+        const isAnticipating = anticipatingColsRef.current.includes(c);
+        const duration = isAnticipating ? 680 : 380;
+
+        setReelSpinDurations(prev => {
+          const next = [...prev];
+          next[c] = duration;
+          return next;
+        });
+
+        // Start spinning column c
+        setSpinningCols(prev => {
+          const next = [...prev];
+          next[c] = true;
+          return next;
+        });
+
+        // Wait for this column's strip to roll down and land
+        await new Promise(r => setTimeout(r, duration));
+
+        // Stop column c and commit its landed tiles
+        setSpinningCols(prev => {
+          const next = [...prev];
+          next[c] = false;
+          return next;
+        });
+        handleReelLanded(c, targetGrid);
+
+        // Subtle mechanical pause before next column spins
+        await new Promise(r => setTimeout(r, 70));
+      }
     }
+
+    setTargetColumnTiles(null);
+    setAnticipatingCols([]);
+    anticipatingColsRef.current = [];
+
+    // Pause before cascades begin
+    await new Promise(r => setTimeout(r, turbo ? 100 : 250));
+    animateCascades(spinResult);
   };
 
   // Modals
@@ -361,9 +430,9 @@ export const WildBountySlot: React.FC = () => {
     }
 
     scattersCountRef.current = 0;
-    stoppedCountRef.current = 0;
     setLandedScattersCount(0);
     setAnticipatingCols([]);
+    anticipatingColsRef.current = [];
     setIsSpinning(true);
     setLastWinAmount(0);
     setActiveWinningWaysCount(0);
@@ -394,15 +463,7 @@ export const WildBountySlot: React.FC = () => {
         const spinResult = res.result;
         pendingSpinResultRef.current = spinResult;
 
-        // Base staggered durations for the 6 rolling strips falling from top
-        const baseDurations = turbo
-          ? [180, 290, 400, 510, 620, 730]
-          : [500, 750, 1000, 1250, 1500, 1750];
-        setReelSpinDurations(baseDurations);
-
-        // Put target symbols in currentGrid and roll strips
-        setCurrentGrid(spinResult.cascades[0].grid);
-        setIsReelsRolling(true);
+        runSpinSequence(spinResult);
       }
     );
   };
@@ -633,19 +694,18 @@ export const WildBountySlot: React.FC = () => {
             </div>
           )}
 
-          {/* 6 Staggered Reels with Uniform Tile Sizing */}
+          {/* 6 Sequential Reels with Uniform Tile Sizing */}
           <div className="grid grid-cols-6 gap-1.5 sm:gap-2 items-center justify-center">
             {currentGrid.map((column, colIdx) => (
               <ReelColumnView
                 key={colIdx}
                 colIdx={colIdx}
                 height={REEL_HEIGHTS[colIdx]}
-                visibleTiles={column}
-                isSpinning={isReelsRolling}
-                spinDuration={reelSpinDurations[colIdx] || 600}
+                visibleTiles={spinningCols[colIdx] && targetColumnTiles ? targetColumnTiles[colIdx] : column}
+                isSpinning={spinningCols[colIdx]}
+                spinDuration={reelSpinDurations[colIdx] || 380}
                 isAnticipating={anticipatingCols.includes(colIdx)}
                 animationPhase={tileAnimationPhase}
-                onReelStop={handleReelStop}
               />
             ))}
           </div>

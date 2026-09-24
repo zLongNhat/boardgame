@@ -44,67 +44,98 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
   animationPhase,
   onReelStop
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const prevTilesRef = useRef<SlotTile[]>(visibleTiles);
   const [tapeTiles, setTapeTiles] = useState<SlotTile[]>(visibleTiles);
   const [offsetY, setOffsetY] = useState(0);
+  const [isRolling, setIsRolling] = useState(false);
   const [hasLanded, setHasLanded] = useState(false);
   const stoppedRef = useRef(false);
 
   useEffect(() => {
-    if (isSpinning) {
-      stoppedRef.current = false;
-      setHasLanded(false);
-
-      // Create a 14-item dummy strip + the target visible tiles at bottom
-      const strip: SlotTile[] = [];
-      const stripLength = 14;
-
-      for (let i = 0; i < stripLength; i++) {
-        const randSym = DUMMY_SYMBOLS[Math.floor(Math.random() * DUMMY_SYMBOLS.length)];
-        strip.push({
-          id: `dummy_${colIdx}_${i}_${Math.random()}`,
-          symbol: randSym,
-          isGold: randSym !== 'scatter' && randSym !== 'wild' && colIdx > 0 && colIdx < 5 && Math.random() < 0.1
-        });
-      }
-
-      strip.push(...visibleTiles);
-      setTapeTiles(strip);
-
-      // Height of 1 tile is approx 80px + gap 8px = 88px
-      const tileStep = 88;
-      const startOffset = -(stripLength * tileStep);
-
-      // Start from high above
-      setOffsetY(startOffset);
-
-      // Downward roll translation
-      const rollTimer = setTimeout(() => {
-        setOffsetY(0);
-      }, 25);
-
-      // Landing timer
-      const stopTimer = setTimeout(() => {
-        setHasLanded(true);
-        if (!stoppedRef.current) {
-          stoppedRef.current = true;
-          if (onReelStop) onReelStop(colIdx);
-        }
-      }, spinDuration);
-
-      return () => {
-        clearTimeout(rollTimer);
-        clearTimeout(stopTimer);
-      };
-    } else {
+    if (!isSpinning) {
+      // Idle or stopped state: update prevTiles to current visibleTiles
+      prevTilesRef.current = visibleTiles;
       setTapeTiles(visibleTiles);
       setOffsetY(0);
+      setIsRolling(false);
       setHasLanded(false);
       stoppedRef.current = true;
+      return;
     }
-  }, [isSpinning, spinDuration, visibleTiles, colIdx]);
+
+    // When spin begins for this column
+    stoppedRef.current = false;
+    setHasLanded(false);
+
+    const prevTiles = prevTilesRef.current && prevTilesRef.current.length === height
+      ? prevTilesRef.current
+      : visibleTiles;
+    const targetTiles = visibleTiles;
+
+    // 12 dummy symbols between target tiles (at top) and prev tiles (at bottom)
+    const dummyCount = 12;
+    const dummyTiles: SlotTile[] = [];
+    for (let i = 0; i < dummyCount; i++) {
+      const randSym = DUMMY_SYMBOLS[Math.floor(Math.random() * DUMMY_SYMBOLS.length)];
+      dummyTiles.push({
+        id: `dummy_${colIdx}_${i}_${Math.random()}`,
+        symbol: randSym,
+        isGold: randSym !== 'scatter' && randSym !== 'wild' && colIdx > 0 && colIdx < 5 && Math.random() < 0.1
+      });
+    }
+
+    // Strip layout: [targetTiles (0..height-1), ...dummyTiles, ...prevTiles]
+    // - At translateY = -((height + dummyCount) * step), the viewport shows prevTiles!
+    // - As it translates down to 0, dummyTiles scroll through, then targetTiles roll into view.
+    // - At translateY = 0, the viewport displays EXACTLY targetTiles!
+    const strip: SlotTile[] = [
+      ...targetTiles,
+      ...dummyTiles,
+      ...prevTiles.map((t, idx) => ({ ...t, id: `prev_${colIdx}_${idx}_${t.id}` }))
+    ];
+
+    setTapeTiles(strip);
+
+    // Calculate step height dynamically from container
+    const clientH = containerRef.current?.clientHeight || 0;
+    const step = clientH > 0 ? clientH / height : 82;
+    const startOffset = -((height + dummyCount) * step);
+
+    // Set initial position at startOffset with transition disabled
+    setOffsetY(startOffset);
+    setIsRolling(false);
+
+    // Start rolling down on next render frame
+    const rafId1 = requestAnimationFrame(() => {
+      const rafId2 = requestAnimationFrame(() => {
+        setIsRolling(true);
+        setOffsetY(0);
+      });
+      return () => cancelAnimationFrame(rafId2);
+    });
+
+    // Landing timer when reel roll finishes
+    const stopTimer = setTimeout(() => {
+      setIsRolling(false);
+      setHasLanded(true);
+      prevTilesRef.current = targetTiles;
+
+      if (!stoppedRef.current) {
+        stoppedRef.current = true;
+        if (onReelStop) onReelStop(colIdx);
+      }
+    }, spinDuration);
+
+    return () => {
+      cancelAnimationFrame(rafId1);
+      clearTimeout(stopTimer);
+    };
+  }, [isSpinning, spinDuration, visibleTiles, colIdx, height, onReelStop]);
 
   return (
     <div
+      ref={containerRef}
       data-col={colIdx}
       className={`relative flex flex-col justify-center rounded-xl p-1 border shadow-inner overflow-hidden transition-all duration-300 ${
         isAnticipating
@@ -132,21 +163,23 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
       {/* Reel Strip Container */}
       <div
         style={{
-          transform: isSpinning ? `translateY(${offsetY}px)` : 'translateY(0px)',
-          transition: isSpinning && offsetY === 0 ? `transform ${spinDuration}ms cubic-bezier(0.12, 0.85, 0.28, 1)` : 'none'
+          transform: `translateY(${offsetY}px)`,
+          transition: isRolling
+            ? `transform ${spinDuration}ms cubic-bezier(0.12, 0.85, 0.28, 1)`
+            : 'none'
         }}
         className={`flex flex-col gap-1.5 sm:gap-2 justify-center ${
           hasLanded ? 'animate-reel-bounce' : ''
         }`}
       >
-        {(isSpinning ? tapeTiles : visibleTiles).map(tile => (
+        {(isSpinning || isRolling ? tapeTiles : visibleTiles).map(tile => (
           <div key={tile.id} className="w-full flex-shrink-0">
             <WildBountyTile
               symbol={tile.symbol}
               isGold={tile.isGold}
               isWinning={tile.isWinning}
               transformedToWild={tile.transformedToWild}
-              animationPhase={isSpinning ? 'idle' : animationPhase}
+              animationPhase={isSpinning || isRolling ? 'idle' : animationPhase}
             />
           </div>
         ))}
