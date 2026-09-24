@@ -9,6 +9,7 @@ import { CasinoEngine } from '../engines/casino/CasinoEngine';
 import { CaseEngine } from '../engines/cases/CaseEngine';
 import { UpgradeEngine } from '../engines/upgrade/UpgradeEngine';
 import { BattleEngine } from '../engines/cases/BattleEngine';
+import { SlotsManager } from '../engines/slots/SlotsManager';
 
 export function registerSocketHandlers(
   io: Server,
@@ -21,7 +22,8 @@ export function registerSocketHandlers(
   casinoEngine?: CasinoEngine,
   caseEngine?: CaseEngine,
   upgradeEngine?: UpgradeEngine,
-  battleEngine?: BattleEngine
+  battleEngine?: BattleEngine,
+  slotsManager?: SlotsManager
 ) {
   const formatPlayerDTO = (p: any) => ({
     id: p.id,
@@ -850,6 +852,43 @@ export function registerSocketHandlers(
         if (res.success) {
           const newBalance = userManager.getBalance(requesterId);
           socket.emit('balance_updated', { balance: newBalance });
+        }
+        if (typeof callback === 'function') {
+          callback(res);
+        }
+      });
+    }
+
+    // Slots handlers
+    if (slotsManager) {
+      socket.on('slots:list', (callback: Function) => {
+        if (typeof callback === 'function') {
+          callback({ success: true, games: slotsManager.getGames() });
+        }
+      });
+
+      socket.on('slots:free-spins', (data: any, callback: Function) => {
+        const { slotId, userId } = data || {};
+        if (!userId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Chưa đăng nhập.' });
+          return;
+        }
+        const freeSpins = slotsManager.getFreeSpins(slotId || 'wild-bounty-showdown', userId);
+        if (typeof callback === 'function') {
+          callback({ success: true, freeSpins });
+        }
+      });
+
+      socket.on('slots:spin', (data: any, callback: Function) => {
+        const { slotId, userId, betAmount, buyFeature } = data || {};
+        if (!userId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Vui lòng đăng nhập để chơi.' });
+          return;
+        }
+        const bet = Math.max(1, Math.floor(Number(betAmount) || 10));
+        const res = slotsManager.spin(userId, slotId || 'wild-bounty-showdown', bet, { buyFeature: !!buyFeature });
+        if (res.success && res.result) {
+          socket.emit('balance_updated', { balance: res.result.newBalance });
         }
         if (typeof callback === 'function') {
           callback(res);

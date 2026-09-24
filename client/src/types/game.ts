@@ -579,3 +579,85 @@ export interface BattleRoomSummary {
   createdAt: number;
 }
 
+// Slots Types
+export type SlotSymbolId =
+  | 'cowgirl'
+  | 'whiskey'
+  | 'hat'
+  | 'holster'
+  | 'A'
+  | 'K'
+  | 'Q'
+  | 'J'
+  | 'wild'
+  | 'scatter';
+
+export interface SlotTile {
+  id: string;
+  symbol: SlotSymbolId;
+  isGold: boolean;
+  isWinning?: boolean;
+  transformedToWild?: boolean;
+}
+
+export interface WinningWay {
+  symbol: SlotSymbolId;
+  reelCount: number;
+  symbolCountsPerReel: number[];
+  ways: number;
+  basePayout: number;
+  payout: number;
+  winningTileIds: string[];
+}
+
+export interface CascadeStep {
+  stepIndex: number;
+  grid: SlotTile[][];
+  multiplier: number;
+  winningWays: WinningWay[];
+  stepWin: number;
+  totalWinSoFar: number;
+  hasWins: boolean;
+  scattersCount: number;
+  transformedWildIds: string[];
+}
+
+export interface FreeSpinsState {
+  userId: string;
+  slotId: string;
+  remaining: number;
+  total: number;
+  betAmount: number;
+  totalWon: number;
+}
+
+export interface SpinResult {
+  spinId: string;
+  slotId: string;
+  betAmount: number;
+  isFreeSpin: boolean;
+  freeSpinsState?: {
+    remaining: number;
+    total: number;
+    totalWon: number;
+  };
+  cascades: CascadeStep[];
+  totalWin: number;
+  scattersCount: number;
+  triggeredFreeSpins: number;
+  newBalance: number;
+}
+
+export interface SlotGameInfo {
+  id: string;
+  name: string;
+  tagline: string;
+  provider: string;
+  banner: string;
+  reels: number[];
+  rtp: string;
+  maxWin: string;
+  volatility: 'Thấp' | 'Trung bình' | 'Cao' | 'Siêu cao';
+  features: string[];
+}
+

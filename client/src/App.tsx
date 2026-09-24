@@ -18,6 +18,7 @@ import { CasesPage } from './pages/CasesPage';
 import { UpgradePage } from './pages/UpgradePage';
 import { InventoryPage } from './pages/InventoryPage';
 import { BattlePage } from './pages/BattlePage';
+import { SlotsPage } from './pages/SlotsPage';
 
 /**
  * OmniDeck Arena — URL Router.
@@ -53,6 +54,8 @@ export const App: React.FC = () => {
               <Route path="/cases" element={<CasesPage />} />
               <Route path="/battles" element={<BattlePage />} />
               <Route path="/battles/:id" element={<BattlePage />} />
+              <Route path="/slots" element={<SlotsPage />} />
+              <Route path="/slots/:id" element={<SlotsPage />} />
               <Route path="/upgrade" element={<UpgradePage />} />
               <Route path="/inventory" element={<InventoryPage />} />
               {/* Giữ tương thích điều hướng cũ */}

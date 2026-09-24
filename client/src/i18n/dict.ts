@@ -10,6 +10,7 @@ const vi = {
   'nav.battles': 'Đấu Hòm (Battle)',
   'nav.upgrade': 'Nâng Cấp',
   'nav.inventory': 'Kho Đồ',
+  'nav.slots': 'Nổ Hũ (Slots)',
   'nav.taixiu': 'Tài Xỉu',
   'nav.mines': 'Mines',
   'nav.goals': 'Goals',
@@ -61,6 +62,8 @@ const vi = {
   'card.coinflip.desc': 'Sấp hay ngửa — thắng 1:1.95',
   'card.rps.desc': 'Thắng nhà cái ăn 1:1.95, hòa hoàn tiền',
   'card.cases.desc': 'Mở 3 loại hòm CS2 — Nhận skin trắng, xanh, tím, đỏ, vàng',
+  'card.battles.desc': 'Đấu mở hòm CS2 2-4 người — Ôm trọn skin đối thủ hoặc Crazy Mode',
+  'card.slots.desc': 'Slot Wild Bounty Showdown (PG Soft) — Nhân đôi x1024, Free Spins x8',
   'card.upgrade.desc': 'Nâng cấp SkinClub — Tùy chỉnh hệ số thưởng và tỉ lệ trúng',
   'card.inventory.desc': 'Quản lý kho đồ skin — Bán lấy tiền hoặc mang đi nâng cấp',
 
@@ -419,6 +422,7 @@ const en: Record<DictKey, string> = {
   'nav.battles': 'Case Battles',
   'nav.upgrade': 'Upgrade',
   'nav.inventory': 'Inventory',
+  'nav.slots': 'Slots (PG Soft)',
   'nav.taixiu': 'Tai Xiu',
   'nav.mines': 'Mines',
   'nav.goals': 'Goals',
@@ -468,6 +472,8 @@ const en: Record<DictKey, string> = {
   'card.coinflip.desc': 'Heads or tails — win 1:1.95',
   'card.rps.desc': 'Beat the house 1:1.95, tie refunds',
   'card.cases.desc': 'Open 3 CS2 cases — Win white, blue, purple, red, gold skins',
+  'card.battles.desc': 'CS2 Case Battles 2-4 players — Winner takes all or Crazy Mode',
+  'card.slots.desc': 'Wild Bounty Showdown Slot (PG Soft) — Doubling up to x1024, Free Spins x8',
   'card.upgrade.desc': 'SkinClub upgrade — Custom target multiplier and win chance',
   'card.inventory.desc': 'Manage inventory skins — Sell for coins or use in upgrade',
 

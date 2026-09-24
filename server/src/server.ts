@@ -13,6 +13,7 @@ import { CasinoEngine } from './engines/casino/CasinoEngine';
 import { CaseEngine } from './engines/cases/CaseEngine';
 import { UpgradeEngine } from './engines/upgrade/UpgradeEngine';
 import { BattleEngine } from './engines/cases/BattleEngine';
+import { SlotsManager } from './engines/slots/SlotsManager';
 import { registerSocketHandlers } from './sockets/gameHandlers';
 import { flushRemoteSaves } from './storage/redisRest';
 
@@ -39,6 +40,7 @@ const casinoEngine = new CasinoEngine(userManager);
 const caseEngine = new CaseEngine(userManager);
 const upgradeEngine = new UpgradeEngine(userManager);
 const battleEngine = new BattleEngine(userManager, caseEngine);
+const slotsManager = new SlotsManager(userManager);
 
 registerSocketHandlers(
   io,
@@ -51,7 +53,8 @@ registerSocketHandlers(
   casinoEngine,
   caseEngine,
   upgradeEngine,
-  battleEngine
+  battleEngine,
+  slotsManager
 );
 
 // Wire Case Battle events to rooms and all sockets
@@ -202,6 +205,41 @@ app.get('/api/battles/:id', (req, res) => {
     return res.status(404).json({ success: false, message: 'Phòng đấu không tồn tại.' });
   }
   return res.json({ success: true, battle });
+});
+
+// Slots REST endpoints
+app.get('/api/slots', (_req, res) => {
+  res.json({ success: true, games: slotsManager.getGames() });
+});
+
+app.get('/api/slots/:id', (req, res) => {
+  const game = slotsManager.getGame(req.params.id);
+  if (!game) {
+    return res.status(404).json({ success: false, message: 'Game slot không tồn tại.' });
+  }
+  res.json({ success: true, game });
+});
+
+app.get('/api/slots/:id/free-spins', (req, res) => {
+  const userId = req.query.userId as string;
+  if (!userId) {
+    return res.status(400).json({ success: false, message: 'Thiếu userId.' });
+  }
+  const freeSpins = slotsManager.getFreeSpins(req.params.id, userId);
+  res.json({ success: true, freeSpins });
+});
+
+app.post('/api/slots/:id/spin', (req, res) => {
+  const { userId, betAmount, buyFeature } = req.body;
+  if (!userId) {
+    return res.status(400).json({ success: false, message: 'Vui lòng đăng nhập.' });
+  }
+  const bet = Math.max(1, Math.floor(Number(betAmount) || 10));
+  const spinRes = slotsManager.spin(userId, req.params.id, bet, { buyFeature: !!buyFeature });
+  if (!spinRes.success) {
+    return res.status(400).json(spinRes);
+  }
+  res.json(spinRes);
 });
 
 // Serve client build in production

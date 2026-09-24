@@ -21,6 +21,7 @@ import {
   Package,
   Zap,
   Swords,
+  Sparkles,
   Menu,
   X
 } from 'lucide-react';
@@ -65,6 +66,12 @@ const NAV_SECTIONS: NavSection[] = [
       { to: '/cases', label: 'nav.cases', icon: Package, end: true, badge: 'CS2', badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
       { to: '/battles', label: 'nav.battles', icon: Swords, end: false, badge: 'PVP', badgeColor: 'bg-rose-500/20 text-rose-300 border-rose-500/30' },
       { to: '/upgrade', label: 'nav.upgrade', icon: Zap, end: true, badge: '95%', badgeColor: 'bg-pink-500/20 text-pink-300 border-pink-500/30' }
+    ]
+  },
+  {
+    title: 'Slot Nổ Hũ (PG Soft)',
+    items: [
+      { to: '/slots', label: 'nav.slots', icon: Sparkles, end: false, badge: 'HOT', badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/30' }
     ]
   },
   {
