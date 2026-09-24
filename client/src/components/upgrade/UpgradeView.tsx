@@ -25,6 +25,7 @@ export const UpgradeView: React.FC = () => {
 
   // Game state
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [lastResult, setLastResult] = useState<UpgradeResult | null>(null);
   const [wheelRotation, setWheelRotation] = useState<number>(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -101,6 +102,8 @@ export const UpgradeView: React.FC = () => {
 
     setErrorMsg(null);
     setIsUpgrading(true);
+    setIsResetting(false);
+    setWheelRotation(0);
     setLastResult(null);
 
     if (socket) {
@@ -115,6 +118,8 @@ export const UpgradeView: React.FC = () => {
         if (!res.success) {
           setErrorMsg(res.message || 'Lỗi khi nâng cấp.');
           setIsUpgrading(false);
+          setIsResetting(false);
+          setWheelRotation(0);
           return;
         }
 
@@ -136,7 +141,6 @@ export const UpgradeView: React.FC = () => {
 
         setTimeout(() => {
           clearInterval(tickTimer);
-          setIsUpgrading(false);
           setLastResult(res);
           if (res.isWin) {
             playCaseWinSound('gold');
@@ -146,6 +150,16 @@ export const UpgradeView: React.FC = () => {
             loadInventory();
           }
           refreshUser();
+
+          // Chờ hết một lượt quay và người chơi xem kết quả 1.2s, sau đó reset về vị trí ban đầu (0 độ)
+          setTimeout(() => {
+            setIsResetting(true);
+            setWheelRotation(0);
+            setTimeout(() => {
+              setIsResetting(false);
+              setIsUpgrading(false); // Hoàn tất lượt quay, sẵn sàng cho lượt tiếp theo
+            }, 400);
+          }, 1200);
         }, 4200);
       });
     }
@@ -338,7 +352,11 @@ export const UpgradeView: React.FC = () => {
                 className="absolute inset-0 flex items-center justify-center will-change-transform"
                 style={{
                   transform: `rotate(${wheelRotation}deg)`,
-                  transition: isUpgrading ? 'transform 4.2s cubic-bezier(0.12, 0.8, 0.2, 1)' : 'none'
+                  transition: isResetting
+                    ? 'transform 0.4s ease-in-out'
+                    : isUpgrading
+                      ? 'transform 4.2s cubic-bezier(0.12, 0.8, 0.2, 1)'
+                      : 'none'
                 }}
               >
                 <div className="w-1.5 h-24 bg-gradient-to-t from-transparent via-amber-300 to-amber-400 rounded-full shadow-[0_0_8px_#fbbf24] -translate-y-12" />
@@ -380,17 +398,17 @@ export const UpgradeView: React.FC = () => {
 
           {/* Upgrade Action Button */}
           <button
-            disabled={isUpgrading || effectiveBet <= 0}
+            disabled={isUpgrading || isResetting || effectiveBet <= 0}
             onClick={handlePlayUpgrade}
             className={`w-full py-4 px-6 rounded-2xl font-black text-lg transition-all shadow-xl flex items-center justify-center gap-3 cursor-pointer ${
-              isUpgrading || effectiveBet <= 0
+              isUpgrading || isResetting || effectiveBet <= 0
                 ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
                 : 'bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-purple-600/30 scale-100 hover:scale-[1.02] active:scale-95'
             }`}
           >
-            {isUpgrading ? (
+            {isUpgrading || isResetting ? (
               <>
-                <RefreshCw className="w-6 h-6 animate-spin" /> Đang Nâng Cấp...
+                <RefreshCw className="w-6 h-6 animate-spin" /> {isResetting ? 'Đang Đặt Lại...' : 'Đang Nâng Cấp...'}
               </>
             ) : (
               <>

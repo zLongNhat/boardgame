@@ -115,7 +115,7 @@ export const AppShell: React.FC = () => {
   const inventoryCount = user?.inventory?.length || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white font-sans overflow-x-hidden flex">
+    <div className="h-screen h-[100dvh] w-full bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white font-sans overflow-hidden flex">
       {/* Mobile Drawer Overlay */}
       {mobileMenuOpen && (
         <div
@@ -126,7 +126,7 @@ export const AppShell: React.FC = () => {
 
       {/* Navigation Sidebar (Desktop fixed + Mobile sliding drawer) */}
       <aside
-        className={`fixed lg:sticky top-0 h-screen z-50 backdrop-blur-xl bg-gray-950/95 lg:bg-gray-900/80 border-r border-gray-800/80 w-64 flex-shrink-0 flex flex-col py-4 px-3 gap-2 shadow-2xl transition-transform duration-300 ease-in-out ${
+        className={`fixed lg:static top-0 h-full z-50 backdrop-blur-xl bg-gray-950/95 lg:bg-gray-900/80 border-r border-gray-800/80 w-64 flex-shrink-0 flex flex-col py-4 px-3 gap-2 shadow-2xl transition-transform duration-300 ease-in-out ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
@@ -219,9 +219,9 @@ export const AppShell: React.FC = () => {
       </aside>
 
       {/* Main Content Column */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
         {/* Topbar */}
-        <header className="sticky top-0 z-40 backdrop-blur-md bg-gray-950/70 border-b border-gray-800/80 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 shadow-lg">
+        <header className="flex-shrink-0 z-40 backdrop-blur-md bg-gray-950/80 border-b border-gray-800/80 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 shadow-lg">
           {/* Left: Mobile hamburger menu & logo */}
           <div className="flex items-center gap-3">
             <button
@@ -314,7 +314,7 @@ export const AppShell: React.FC = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-grow w-full px-4 sm:px-6 pt-6 pb-12">
+        <main className="flex-1 overflow-y-auto w-full px-4 sm:px-6 pt-6 pb-12">
           <Outlet />
         </main>
       </div>
