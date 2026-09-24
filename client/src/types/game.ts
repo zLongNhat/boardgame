@@ -589,6 +589,14 @@ export type SlotSymbolId =
   | 'K'
   | 'Q'
   | 'J'
+  | 'mj_green'
+  | 'mj_red'
+  | 'mj_white'
+  | 'mj_char8'
+  | 'mj_dots5'
+  | 'mj_bamboo5'
+  | 'mj_dots3'
+  | 'mj_bamboo2'
   | 'wild'
   | 'scatter';
 

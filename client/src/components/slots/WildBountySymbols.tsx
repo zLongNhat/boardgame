@@ -110,6 +110,15 @@ export const WildBountyTile: React.FC<SymbolProps> = ({
           textColor: 'text-rose-200 font-black tracking-wider',
           borderColor: 'border-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.6)]'
         };
+      default:
+        return {
+          label: String(symbol),
+          icon: '🀄',
+          sub: '',
+          bg: 'from-stone-700/35 via-zinc-800/45 to-stone-900/60',
+          textColor: 'text-stone-300',
+          borderColor: 'border-stone-500/50'
+        };
     }
   };
 

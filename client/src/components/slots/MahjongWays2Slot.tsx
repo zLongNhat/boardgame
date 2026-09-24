@@ -5,7 +5,6 @@ import {
   VolumeX,
   Zap,
   RotateCcw,
-  Sparkles,
   HelpCircle,
   X,
   Play,
@@ -14,16 +13,32 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useGameSocketContext } from '../../hooks/GameSocketContext';
-import { CascadeStep, FreeSpinsState, SpinResult, SlotTile } from '../../types/game';
+import { CascadeStep, FreeSpinsState, SpinResult, SlotTile, SlotSymbolId } from '../../types/game';
 import { TileAnimationPhase } from './WildBountySymbols';
+import { MahjongTile } from './MahjongWays2Symbols';
 import { ReelColumnView } from './ReelColumnView';
 
-const REEL_HEIGHTS = [3, 4, 5, 5, 4, 3];
-const MULTIPLIERS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024];
+const REEL_HEIGHTS = [4, 5, 5, 5, 4];
+const BASE_MULTIPLIERS = [1, 2, 3, 5];
+const FREE_MULTIPLIERS = [2, 4, 6, 10];
 const BET_PRESETS = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
+const MAHJONG_DUMMY: SlotSymbolId[] = [
+  'mj_bamboo2',
+  'mj_dots3',
+  'mj_bamboo5',
+  'mj_dots5',
+  'mj_char8',
+  'mj_white',
+  'mj_red',
+  'mj_green',
+  'scatter',
+  'mj_dots5',
+  'mj_char8',
+  'mj_bamboo2'
+];
 
-// Lightweight Web Audio synthesizer for Western sound effects
-class WesternSoundFX {
+// Lightweight Web Audio synthesizer for Mahjong pentatonic effects
+class MahjongSoundFX {
   private ctx: AudioContext | null = null;
   public enabled: boolean = true;
 
@@ -244,9 +259,9 @@ class WesternSoundFX {
   }
 }
 
-const soundFX = new WesternSoundFX();
+const soundFX = new MahjongSoundFX();
 
-export const WildBountySlot: React.FC = () => {
+export const MahjongWays2Slot: React.FC = () => {
   const { user } = useAuth();
   const { socket } = useGameSocketContext();
 
@@ -264,8 +279,8 @@ export const WildBountySlot: React.FC = () => {
     REEL_HEIGHTS.map((h, colIdx) =>
       Array.from({ length: h }, (_, rowIdx) => ({
         id: `init_${colIdx}_${rowIdx}`,
-        symbol: colIdx === 0 ? 'cowgirl' : 'whiskey',
-        isGold: colIdx > 0 && colIdx < 5 && rowIdx === 1
+        symbol: (['mj_green', 'mj_red', 'mj_white', 'mj_char8', 'mj_dots5'] as SlotSymbolId[])[(colIdx + rowIdx) % 5],
+        isGold: colIdx >= 1 && colIdx <= 3 && rowIdx === 1
       }))
     )
   );
@@ -278,15 +293,15 @@ export const WildBountySlot: React.FC = () => {
   const [isScreenShaking, setIsScreenShaking] = useState(false);
 
   // Top-to-Bottom Sequential Reel Rolling & Scatter Drop states
-  const [spinningCols, setSpinningCols] = useState<boolean[]>([false, false, false, false, false, false]);
+  const [spinningCols, setSpinningCols] = useState<boolean[]>([false, false, false, false, false]);
   const [targetColumnTiles, setTargetColumnTiles] = useState<SlotTile[][] | null>(null);
-  const [cascadeDropCounts, setCascadeDropCounts] = useState<number[]>([0, 0, 0, 0, 0, 0]);
+  const [cascadeDropCounts, setCascadeDropCounts] = useState<number[]>([0, 0, 0, 0, 0]);
   // Khoảng rơi từng ô (số bước ô) cho cascade: ô dưới điểm vỡ = 0 (đứng yên),
   // ô trên điểm vỡ + ô mới > 0 (rơi thẳng xuống, không nảy).
   const [cascadeFallDistances, setCascadeFallDistances] = useState<number[][]>([]);
   const [anticipatingCols, setAnticipatingCols] = useState<number[]>([]);
   const [landedScattersCount, setLandedScattersCount] = useState(0);
-  const [reelSpinDurations, setReelSpinDurations] = useState<number[]>([380, 380, 380, 380, 380, 380]);
+  const [reelSpinDurations, setReelSpinDurations] = useState<number[]>([380, 380, 380, 380, 380]);
 
   const pendingSpinResultRef = useRef<SpinResult | null>(null);
   const scattersCountRef = useRef(0);
@@ -337,8 +352,8 @@ export const WildBountySlot: React.FC = () => {
       soundFX.playScatterLand(scattersCountRef.current);
 
       // If 2 scatters have landed and there are remaining reels, trigger anticipation!
-      if (scattersCountRef.current >= 2 && colIdx < 5) {
-        const remaining = Array.from({ length: 5 - colIdx }, (_, i) => colIdx + 1 + i);
+      if (scattersCountRef.current >= 2 && colIdx < 4) {
+        const remaining = Array.from({ length: 4 - colIdx }, (_, i) => colIdx + 1 + i);
         setAnticipatingCols(remaining);
         anticipatingColsRef.current = remaining;
         soundFX.playAnticipation();
@@ -353,7 +368,7 @@ export const WildBountySlot: React.FC = () => {
 
     if (turbo) {
       // In Turbo mode: rapid sequential (120ms each)
-      for (let c = 0; c < 6; c++) {
+      for (let c = 0; c < 5; c++) {
         setReelSpinDurations(prev => {
           const next = [...prev];
           next[c] = 160;
@@ -375,9 +390,9 @@ export const WildBountySlot: React.FC = () => {
         handleReelLanded(c, targetGrid);
       }
     } else {
-      // In Normal mode: "từng cột quay một chứ không phải như hiện tại"
-      // Column 0 -> Column 1 -> Column 2 -> Column 3 -> Column 4 -> Column 5
-      for (let c = 0; c < 6; c++) {
+      // In Normal mode: từng cột quay một
+      // Column 0 -> Column 1 -> Column 2 -> Column 3 -> Column 4
+      for (let c = 0; c < 5; c++) {
         const isAnticipating = anticipatingColsRef.current.includes(c);
         const duration = isAnticipating ? 680 : 380;
 
@@ -420,7 +435,6 @@ export const WildBountySlot: React.FC = () => {
   };
 
   // Modals
-  const [showBuyModal, setShowBuyModal] = useState(false);
   const [showPaytableModal, setShowPaytableModal] = useState(false);
   const [bigWinOverlay, setBigWinOverlay] = useState<{ amount: number; title: string } | null>(null);
   const [freeSpinsWonModal, setFreeSpinsWonModal] = useState<number | null>(null);
@@ -437,21 +451,21 @@ export const WildBountySlot: React.FC = () => {
   // Fetch free spins state on mount
   useEffect(() => {
     if (socket && user?.id) {
-      socket.emit('slots:free-spins', { slotId: 'wild-bounty-showdown', userId: user.id }, (res: any) => {
+      socket.emit('slots:free-spins', { slotId: 'mahjong-ways-2', userId: user.id }, (res: any) => {
         if (res?.success && res.freeSpins) {
           setFreeSpinsState(res.freeSpins);
-          setActiveMultiplier(8);
+          setActiveMultiplier(2);
         }
       });
     }
   }, [socket, user?.id]);
 
-  // Main spin handler
-  const handleSpin = (isBuyFeature = false) => {
+  // Main spin handler (Mahjong Ways 2 gốc không có Mua Free Spins)
+  const handleSpin = () => {
     if (isSpinning || !user?.id) return;
 
     const inFreeSpins = freeSpinsState && freeSpinsState.remaining > 0;
-    const cost = isBuyFeature ? betAmount * 75 : inFreeSpins ? 0 : betAmount;
+    const cost = inFreeSpins ? 0 : betAmount;
 
     if (cost > 0 && (user.balance ?? 0) < cost) {
       alert(`Số dư không đủ! Cần ${cost.toLocaleString()} 🪙 để quay.`);
@@ -466,7 +480,7 @@ export const WildBountySlot: React.FC = () => {
     setIsSpinning(true);
     setLastWinAmount(0);
     setActiveWinningWaysCount(0);
-    setActiveMultiplier(inFreeSpins ? 8 : 1);
+    setActiveMultiplier(inFreeSpins ? 2 : 1);
     soundFX.playSpin();
 
     if (!socket) {
@@ -477,10 +491,10 @@ export const WildBountySlot: React.FC = () => {
     socket.emit(
       'slots:spin',
       {
-        slotId: 'wild-bounty-showdown',
+        slotId: 'mahjong-ways-2',
         userId: user.id,
         betAmount,
-        buyFeature: isBuyFeature
+        buyFeature: false
       },
       (res: { success: boolean; result?: SpinResult; message?: string }) => {
         if (!res.success || !res.result) {
@@ -549,7 +563,7 @@ export const WildBountySlot: React.FC = () => {
           // Wait for gravity fall only (no bounce-up)
           await new Promise(r => setTimeout(r, turbo ? 200 : 380));
           // Reset drop counts so next cascade step can trigger fresh
-          setCascadeDropCounts([0, 0, 0, 0, 0, 0]);
+          setCascadeDropCounts([0, 0, 0, 0, 0]);
           setCascadeFallDistances([]);
         }
       } else {
@@ -559,7 +573,7 @@ export const WildBountySlot: React.FC = () => {
     }
 
     setTileAnimationPhase('idle');
-    setCascadeDropCounts([0, 0, 0, 0, 0, 0]);
+    setCascadeDropCounts([0, 0, 0, 0, 0]);
     setCascadeFallDistances([]);
 
     // Finalize spin
@@ -572,7 +586,7 @@ export const WildBountySlot: React.FC = () => {
     if (spinResult.freeSpinsState) {
       setFreeSpinsState({
         userId: user!.id,
-        slotId: 'wild-bounty-showdown',
+        slotId: 'mahjong-ways-2',
         remaining: spinResult.freeSpinsState.remaining,
         total: spinResult.freeSpinsState.total,
         betAmount: spinResult.betAmount,
@@ -616,30 +630,30 @@ export const WildBountySlot: React.FC = () => {
   return (
     <div className="relative w-full max-w-5xl mx-auto flex flex-col items-center select-none text-white pb-12">
       {/* Background Ambience */}
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-950/40 via-gray-950/90 to-gray-950 rounded-2xl pointer-events-none" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-emerald-950/50 via-gray-950/90 to-gray-950 rounded-2xl pointer-events-none" />
 
       {/* Top Header & Badges */}
-      <div className="w-full flex items-center justify-between px-3 py-2 border-b border-amber-900/40 bg-gray-950/60 rounded-t-2xl">
+      <div className="w-full flex items-center justify-between px-3 py-2 border-b border-emerald-900/40 bg-gray-950/60 rounded-t-2xl">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-400 flex items-center justify-center shadow-lg shadow-amber-500/30">
-            <span className="text-base">🤠</span>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-700 to-yellow-400 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+            <span className="text-base">🀄</span>
           </div>
           <div>
-            <h1 className="text-sm sm:text-base font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-              Wild Bounty Showdown
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+            <h1 className="text-sm sm:text-base font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+              Mahjong Ways 2
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 PG SOFT
               </span>
             </h1>
             <p className="text-[11px] text-gray-400 flex items-center gap-2">
-              <span>3,600 Cách Thắng</span>
+              <span>2,000 Cách Thắng</span>
               <span>•</span>
-              <span>RTP 96.75%</span>
+              <span>RTP 96.95%</span>
             </p>
           </div>
         </div>
 
-        {/* Top Controls: Sound, Help, Buy */}
+        {/* Top Controls: Sound, Help (bản gốc không có Mua Free Spins) */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowPaytableModal(true)}
@@ -653,17 +667,8 @@ export const WildBountySlot: React.FC = () => {
             className="p-1.5 rounded-lg bg-gray-800/80 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white transition-colors"
             title="Âm thanh"
           >
-            {soundEnabled ? <Volume2 className="w-4 h-4 text-amber-400" /> : <VolumeX className="w-4 h-4" />}
+            {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4" />}
           </button>
-          {!isFreeSpinActive && (
-            <button
-              onClick={() => setShowBuyModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 text-gray-950 shadow-md shadow-amber-500/30 hover:brightness-110 active:scale-95 transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5 fill-current" />
-              <span>MUA TÍNH NĂNG</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -682,15 +687,15 @@ export const WildBountySlot: React.FC = () => {
         </div>
       )}
 
-      {/* Western Multiplier Bar (x1 -> x1024) */}
+      {/* Mahjong Multiplier Ladder (chuẩn PG: base x1-x2-x3-x5, free x2-x4-x6-x10) */}
       <div className="w-full my-3 px-2">
-        <div className="bg-gray-950/80 border border-amber-900/50 rounded-xl p-2 shadow-inner">
-          <div className="text-[10px] uppercase font-bold text-amber-400/80 text-center mb-1 flex items-center justify-center gap-1">
-            <Flame className="w-3 h-3 text-amber-500" />
-            <span>Hệ Số Nhân Đôi Thắng Cuộc (Max x1,024)</span>
+        <div className="bg-gray-950/80 border border-emerald-900/50 rounded-xl p-2 shadow-inner">
+          <div className="text-[10px] uppercase font-bold text-emerald-400/80 text-center mb-1 flex items-center justify-center gap-1">
+            <Flame className="w-3 h-3 text-emerald-500" />
+            <span>{isFreeSpinActive ? 'Hệ Số Free Spins (x2 ➔ x10)' : 'Hệ Số Thắng Cuộc (x1 ➔ x5)'}</span>
           </div>
           <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar py-1">
-            {MULTIPLIERS.map(m => {
+            {(isFreeSpinActive ? FREE_MULTIPLIERS : BASE_MULTIPLIERS).map(m => {
               const isActive = activeMultiplier === m;
               return (
                 <div
@@ -711,18 +716,18 @@ export const WildBountySlot: React.FC = () => {
         </div>
       </div>
 
-      {/* Western Saloon 6-Reel Grid Frame (3-4-5-5-4-3) */}
+      {/* Mahjong Jade 5-Reel Grid Frame (4-5-5-5-4) */}
       <div className="w-full px-2 sm:px-4">
         <div
-          className={`relative p-2 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-950/60 via-stone-900/90 to-black border-2 border-amber-700/60 shadow-[0_10px_35px_rgba(0,0,0,0.8)] transition-transform duration-100 ${
+          className={`relative p-2 sm:p-4 rounded-2xl bg-gradient-to-b from-emerald-950/60 via-stone-900/90 to-black border-2 border-emerald-700/60 shadow-[0_10px_35px_rgba(0,0,0,0.8)] transition-transform duration-100 ${
             isScreenShaking ? 'animate-screen-shake' : ''
           }`}
         >
-          {/* Wood corner accents */}
-          <div className="absolute top-1 left-1 w-3 h-3 border-t-2 border-l-2 border-amber-400 pointer-events-none" />
-          <div className="absolute top-1 right-1 w-3 h-3 border-t-2 border-r-2 border-amber-400 pointer-events-none" />
-          <div className="absolute bottom-1 left-1 w-3 h-3 border-b-2 border-l-2 border-amber-400 pointer-events-none" />
-          <div className="absolute bottom-1 right-1 w-3 h-3 border-b-2 border-r-2 border-amber-400 pointer-events-none" />
+          {/* Jade corner accents */}
+          <div className="absolute top-1 left-1 w-3 h-3 border-t-2 border-l-2 border-emerald-400 pointer-events-none" />
+          <div className="absolute top-1 right-1 w-3 h-3 border-t-2 border-r-2 border-emerald-400 pointer-events-none" />
+          <div className="absolute bottom-1 left-1 w-3 h-3 border-b-2 border-l-2 border-emerald-400 pointer-events-none" />
+          <div className="absolute bottom-1 right-1 w-3 h-3 border-b-2 border-r-2 border-emerald-400 pointer-events-none" />
 
           {/* Scatter Landing Live Counter Banner (Trôi từ trên xuống cũng tính) */}
           {landedScattersCount > 0 && (
@@ -734,7 +739,7 @@ export const WildBountySlot: React.FC = () => {
                     : 'bg-rose-950/90 border border-rose-500 text-rose-200 animate-pulse'
                 }`}
               >
-                <span>🗝️</span>
+                <span>🀄</span>
                 <span>SCATTERS RƠI: {landedScattersCount} / 3</span>
                 {landedScattersCount >= 3 ? (
                   <span className="font-extrabold uppercase">— KÍCH HOẠT FREE SPINS! 🔥</span>
@@ -745,8 +750,8 @@ export const WildBountySlot: React.FC = () => {
             </div>
           )}
 
-          {/* 6 Sequential Reels with Uniform Tile Sizing */}
-          <div className="grid grid-cols-6 gap-1.5 sm:gap-2 items-center justify-center">
+          {/* 5 Sequential Reels (4-5-5-5-4) */}
+          <div className="grid grid-cols-5 gap-1.5 sm:gap-2 items-center justify-center">
             {currentGrid.map((column, colIdx) => (
               <ReelColumnView
                 key={colIdx}
@@ -759,6 +764,17 @@ export const WildBountySlot: React.FC = () => {
                 animationPhase={tileAnimationPhase}
                 cascadeDropCount={cascadeDropCounts[colIdx]}
                 fallDistances={cascadeFallDistances[colIdx]}
+                dummySymbols={MAHJONG_DUMMY}
+                goldCols={[1, 2, 3]}
+                renderTile={(tile, phase) => (
+                  <MahjongTile
+                    symbol={tile.symbol}
+                    isGold={tile.isGold}
+                    isWinning={tile.isWinning}
+                    transformedToWild={tile.transformedToWild}
+                    animationPhase={phase}
+                  />
+                )}
               />
             ))}
           </div>
@@ -875,10 +891,10 @@ export const WildBountySlot: React.FC = () => {
             </button>
           </div>
 
-          {/* Revolver Barrel Spin Button */}
+          {/* Mahjong Spin Button */}
           <button
             disabled={isSpinning && autoSpinCount === null}
-            onClick={() => handleSpin(false)}
+            onClick={() => handleSpin()}
             className={`relative group w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center font-black transition-all active:scale-90 ${
               isSpinning
                 ? 'bg-gray-800 border-2 border-gray-700 text-gray-500 cursor-not-allowed'
@@ -893,58 +909,10 @@ export const WildBountySlot: React.FC = () => {
         </div>
       </div>
 
-      {/* Feature Buy Modal */}
-      {showBuyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md bg-gradient-to-b from-gray-900 to-gray-950 border-2 border-amber-500/60 rounded-2xl p-5 shadow-2xl text-center">
-            <button
-              onClick={() => setShowBuyModal(false)}
-              className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-white rounded-lg bg-gray-800"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-400 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-amber-500/40">
-              <Sparkles className="w-7 h-7 text-gray-950 fill-current" />
-            </div>
-            <h3 className="text-lg font-black uppercase text-amber-300">Mua Vòng Quay Miễn Phí</h3>
-            <p className="text-xs text-gray-300 mt-1 mb-4">
-              Kích hoạt ngay lập tức **10 Vòng Quay Miễn Phí** với hệ số nhân khởi điểm **x8** và nhân đôi liên tục
-              lên đến **x1,024**!
-            </p>
-
-            <div className="bg-black/50 border border-amber-500/30 rounded-xl p-3 mb-4">
-              <div className="text-xs text-gray-400">Giá mua (75x tiền cược):</div>
-              <div className="text-2xl font-black text-yellow-400 mt-1">
-                {(betAmount * 75).toLocaleString()} 🪙
-              </div>
-              <div className="text-[11px] text-gray-500 mt-0.5">Mức cược tính: {betAmount.toLocaleString()} 🪙</div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowBuyModal(false)}
-                className="flex-1 py-2.5 rounded-xl font-bold bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={() => {
-                  setShowBuyModal(false);
-                  handleSpin(true);
-                }}
-                className="flex-1 py-2.5 rounded-xl font-black bg-gradient-to-r from-amber-600 to-yellow-500 text-gray-950 hover:brightness-110 shadow-lg shadow-amber-500/30 transition-all"
-              >
-                Xác nhận Mua
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Paytable & Rules Modal */}
+      {/* Paytable & Rules Modal (chuẩn PG Soft Mahjong Ways 2) */}
       {showPaytableModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-gray-900 border border-amber-600/50 rounded-2xl p-5 shadow-2xl">
+          <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-gray-900 border border-emerald-600/50 rounded-2xl p-5 shadow-2xl">
             <button
               onClick={() => setShowPaytableModal(false)}
               className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-white rounded-lg bg-gray-800"
@@ -952,49 +920,49 @@ export const WildBountySlot: React.FC = () => {
               <X className="w-4 h-4" />
             </button>
             <div className="flex items-center gap-2 mb-4">
-              <Award className="w-6 h-6 text-amber-400" />
-              <h3 className="text-lg font-black uppercase text-amber-300">Bảng Trả Thưởng & Quy Tắc</h3>
+              <Award className="w-6 h-6 text-emerald-400" />
+              <h3 className="text-lg font-black uppercase text-emerald-300">Bảng Trả Thưởng & Quy Tắc</h3>
             </div>
 
             {/* Feature Highlights */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5 text-xs">
-              <div className="bg-black/40 border border-amber-900/40 p-3 rounded-xl">
-                <span className="font-bold text-amber-400">🔥 Hệ số nhân gấp đôi:</span>
+              <div className="bg-black/40 border border-emerald-900/40 p-3 rounded-xl">
+                <span className="font-bold text-emerald-400">🔥 Hệ số thang PG:</span>
                 <p className="text-gray-300 mt-1">
-                  Mỗi đợt nổ liên hoàn, hệ số nhân sẽ nhân đôi: x1 ➔ x2 ➔ x4 ➔ x8 ... lên đến x1,024!
+                  Base game: x1 ➔ x2 ➔ x3 ➔ x5 theo từng cascade. Free Spins nhân đôi: x2 ➔ x4 ➔ x6 ➔ x10!
                 </p>
               </div>
-              <div className="bg-black/40 border border-amber-900/40 p-3 rounded-xl">
-                <span className="font-bold text-yellow-400">⭐ Viền vàng biến WILD:</span>
+              <div className="bg-black/40 border border-emerald-900/40 p-3 rounded-xl">
+                <span className="font-bold text-yellow-400">⭐ Mạ vàng hóa WILD:</span>
                 <p className="text-gray-300 mt-1">
-                  Các biểu tượng viền vàng ở cuộn 2, 3, 4, 5 khi tham gia thắng sẽ hóa thành WILD ở đợt nổ tiếp theo!
+                  Symbol mạ vàng ở cuộn 2-3-4 khi tham gia thắng sẽ hóa WILD. Free Spins: toàn bộ cuộn giữa tự mạ vàng!
                 </p>
               </div>
-              <div className="bg-black/40 border border-amber-900/40 p-3 rounded-xl sm:col-span-2">
-                <span className="font-bold text-rose-400">🗝️ 3 Scatters ➔ 10 Free Spins:</span>
+              <div className="bg-black/40 border border-emerald-900/40 p-3 rounded-xl sm:col-span-2">
+                <span className="font-bold text-rose-400">🀄 3 Scatters ➔ 10 Free Spins:</span>
                 <p className="text-gray-300 mt-1">
-                  Trong Vòng Quay Miễn Phí, hệ số nhân khởi điểm ngay từ <strong>x8</strong> và nhân đôi liên tục!
+                  Mỗi scatter thêm +2 lượt. Trong free spins nổ thêm scatter được retrigger. Không có Mua Tính Năng (chuẩn gốc).
                 </p>
               </div>
             </div>
 
             {/* Symbols Table */}
-            <h4 className="font-bold text-xs uppercase text-gray-400 mb-2">Giá Trị Biểu Tượng (3 - 6 Cuộn)</h4>
+            <h4 className="font-bold text-xs uppercase text-gray-400 mb-2">Giá Trị (3 - 4 - 5 Cuộn, 2,000 Ways)</h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
               {[
-                { name: 'Nữ Thợ Săn', icon: '🤠', pay: '10 / 20 / 30 / 50' },
-                { name: 'Whisky', icon: '🥃', pay: '8 / 15 / 20 / 30' },
-                { name: 'Mũ Stetson', icon: '👒', pay: '5 / 10 / 15 / 20' },
-                { name: 'Bao Súng', icon: '🔫', pay: '4 / 8 / 10 / 15' },
-                { name: 'Át (A)', icon: '♠️', pay: '2 / 5 / 8 / 10' },
-                { name: 'Vua (K)', icon: '👑', pay: '2 / 4 / 6 / 8' },
-                { name: 'Hậu (Q)', icon: '💎', pay: '1 / 3 / 5 / 6' },
-                { name: 'Bồi (J)', icon: '🗡️', pay: '1 / 2 / 4 / 5' }
+                { name: 'Phát (Green)', icon: '發', pay: '10 / 25 / 50' },
+                { name: 'Trung (Red)', icon: '中', pay: '8 / 20 / 40' },
+                { name: 'Bạch (White)', icon: '白', pay: '6 / 15 / 30' },
+                { name: 'Bát Vạn', icon: '捌萬', pay: '5 / 10 / 15' },
+                { name: 'Ngũ Đồng', icon: '筒', pay: '3 / 5 / 12' },
+                { name: 'Ngũ Sách', icon: '索', pay: '3 / 5 / 12' },
+                { name: 'Tam Đồng', icon: '筒', pay: '2 / 4 / 10' },
+                { name: 'Nhị Sách', icon: '索', pay: '2 / 4 / 10' }
               ].map(s => (
                 <div key={s.name} className="bg-black/30 border border-gray-800 p-2 rounded-lg flex flex-col items-center">
                   <span className="text-2xl">{s.icon}</span>
                   <span className="font-bold text-gray-300 mt-1">{s.name}</span>
-                  <span className="text-[10px] text-amber-400 mt-0.5">{s.pay}</span>
+                  <span className="text-[10px] text-emerald-400 mt-0.5">{s.pay}</span>
                 </div>
               ))}
             </div>
@@ -1014,7 +982,7 @@ export const WildBountySlot: React.FC = () => {
             <div className="text-3xl font-black text-yellow-300 my-3">
               {freeSpinsWonModal} VÒNG QUAY MIỄN PHÍ
             </div>
-            <p className="text-xs text-yellow-400/90 mb-5">Hệ số nhân bắt đầu từ x8 và nhân đôi không giới hạn!</p>
+            <p className="text-xs text-yellow-400/90 mb-5">Hệ số Free Spins x2 ➔ x4 ➔ x6 ➔ x10, cuộn giữa mạ vàng!</p>
             <button
               onClick={() => {
                 setFreeSpinsWonModal(null);

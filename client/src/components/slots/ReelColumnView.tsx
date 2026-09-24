@@ -11,6 +11,10 @@ interface ReelColumnViewProps {
   isAnticipating?: boolean;
   animationPhase: TileAnimationPhase;
   cascadeDropCount?: number; // Number of tiles dropped from top during cascade
+  fallDistances?: number[]; // Khoảng rơi từng ô (số bước ô), 0 = đứng yên
+  dummySymbols?: SlotSymbolId[];
+  goldCols?: number[];
+  renderTile?: (tile: SlotTile, phase: TileAnimationPhase) => React.ReactNode;
   onReelStop?: (colIdx: number) => void;
 }
 
@@ -44,6 +48,10 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
   isAnticipating,
   animationPhase,
   cascadeDropCount = 0,
+  fallDistances,
+  dummySymbols,
+  goldCols,
+  renderTile,
   onReelStop
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -51,25 +59,27 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
   const [tapeTiles, setTapeTiles] = useState<SlotTile[]>(visibleTiles);
   const [offsetY, setOffsetY] = useState(0);
   const [isRolling, setIsRolling] = useState(false);
-  const [hasLanded, setHasLanded] = useState(false);
   const stoppedRef = useRef(false);
+  // Offset rơi từng ô cho cascade (px). Ô đứng yên luôn = 0, không áp transition.
+  const [tileOffsets, setTileOffsets] = useState<number[]>(() => new Array(height).fill(0));
+  const [cascadeFalling, setCascadeFalling] = useState(false);
 
   // 1. Initial spin roll logic (when isSpinning === true)
   useEffect(() => {
     if (!isSpinning) {
-      if (!cascadeDropCount) {
+      const isCascading =
+        cascadeDropCount > 0 || (fallDistances && fallDistances.some(f => f > 0));
+      if (!isCascading) {
         prevTilesRef.current = visibleTiles;
         setTapeTiles(visibleTiles);
         setOffsetY(0);
         setIsRolling(false);
-        setHasLanded(false);
         stoppedRef.current = true;
       }
       return;
     }
 
     stoppedRef.current = false;
-    setHasLanded(false);
 
     const prevTiles = prevTilesRef.current && prevTilesRef.current.length === height
       ? prevTilesRef.current
@@ -78,12 +88,14 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
 
     const dummyCount = 12;
     const dummyTiles: SlotTile[] = [];
+    const pool = dummySymbols && dummySymbols.length > 0 ? dummySymbols : DUMMY_SYMBOLS;
+    const goldAllowed = goldCols ? goldCols.includes(colIdx) : colIdx > 0 && colIdx < 5;
     for (let i = 0; i < dummyCount; i++) {
-      const randSym = DUMMY_SYMBOLS[Math.floor(Math.random() * DUMMY_SYMBOLS.length)];
+      const randSym = pool[Math.floor(Math.random() * pool.length)];
       dummyTiles.push({
         id: `dummy_${colIdx}_${i}_${Math.random()}`,
         symbol: randSym,
-        isGold: randSym !== 'scatter' && randSym !== 'wild' && colIdx > 0 && colIdx < 5 && Math.random() < 0.1
+        isGold: randSym !== 'scatter' && randSym !== 'wild' && goldAllowed && Math.random() < 0.1
       });
     }
 
@@ -112,7 +124,6 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
 
     const stopTimer = setTimeout(() => {
       setIsRolling(false);
-      setHasLanded(true);
       prevTilesRef.current = targetTiles;
 
       if (!stoppedRef.current) {
@@ -127,44 +138,50 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
     };
   }, [isSpinning, spinDuration, visibleTiles, colIdx, height, onReelStop, cascadeDropCount]);
 
-  // 2. Cascade Drop logic: continuous strip sliding down from top when tiles shatter
+  // 2. Cascade Drop logic: chỉ ô phía trên điểm vỡ rơi thẳng xuống.
+  // Ô dưới điểm vỡ (fall = 0) đứng yên 100%, không áp animation/transition.
+  // Tổng thể chỉ rơi xuống (translateY âm -> 0), không nảy lên (no overshoot/bounce).
   useEffect(() => {
-    if (cascadeDropCount > 0 && !isSpinning) {
-      const clientH = containerRef.current?.clientHeight || 0;
-      const step = clientH > 0 ? clientH / height : 82;
-      const startOffset = -(cascadeDropCount * step);
-
-      // Current visibleTiles already contains new top tiles + dropped survivors
-      setTapeTiles(visibleTiles);
-      setOffsetY(startOffset);
-      setIsRolling(false);
-      setHasLanded(false);
-
-      const rafId1 = requestAnimationFrame(() => {
-        const rafId2 = requestAnimationFrame(() => {
-          setIsRolling(true);
-          setOffsetY(0);
-        });
-        return () => cancelAnimationFrame(rafId2);
-      });
-
-      const landTimer = setTimeout(() => {
-        setIsRolling(false);
-        setHasLanded(true);
-        prevTilesRef.current = visibleTiles;
-      }, 340);
-
-      const bounceClearTimer = setTimeout(() => {
-        setHasLanded(false);
-      }, 550);
-
-      return () => {
-        cancelAnimationFrame(rafId1);
-        clearTimeout(landTimer);
-        clearTimeout(bounceClearTimer);
-      };
+    const hasFall =
+      !isSpinning &&
+      fallDistances &&
+      fallDistances.length === height &&
+      fallDistances.some(f => f > 0);
+    if (!hasFall) {
+      if (!isSpinning) {
+        setCascadeFalling(false);
+        setTileOffsets(new Array(height).fill(0));
+      }
+      return;
     }
-  }, [cascadeDropCount, isSpinning, visibleTiles, height]);
+
+    const clientH = containerRef.current?.clientHeight || height * 82;
+    const step = clientH > 0 ? clientH / height : 82;
+    const startOffsets = (fallDistances as number[]).map(f => -f * step);
+
+    setCascadeFalling(false);
+    setTileOffsets(startOffsets);
+
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        setCascadeFalling(true);
+        setTileOffsets(new Array(height).fill(0));
+      });
+    });
+
+    const landTimer = setTimeout(() => {
+      setCascadeFalling(false);
+      setTileOffsets(new Array(height).fill(0));
+      prevTilesRef.current = visibleTiles;
+    }, 360);
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+      clearTimeout(landTimer);
+    };
+  }, [fallDistances, isSpinning, visibleTiles, height]);
 
   return (
     <div
@@ -192,31 +209,49 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
         </div>
       )}
 
-      {/* Reel Strip Container */}
+      {/* Reel Strip Container (chỉ dùng cho spin đầu, cascade dùng animation từng ô) */}
       <div
         style={{
           transform: `translateY(${offsetY}px)`,
           transition: isRolling
-            ? `transform ${isSpinning ? spinDuration : 340}ms cubic-bezier(${
-                isSpinning ? '0.12, 0.85, 0.28, 1' : '0.22, 1, 0.36, 1.15'
-              })`
+            ? `transform ${spinDuration}ms cubic-bezier(0.12, 0.85, 0.28, 1)`
             : 'none'
         }}
-        className={`flex flex-col gap-1.5 sm:gap-2 justify-center ${
-          hasLanded ? 'animate-reel-bounce' : ''
-        }`}
+        className="flex flex-col gap-1.5 sm:gap-2 justify-center"
       >
-        {(isSpinning || isRolling || cascadeDropCount > 0 ? tapeTiles : visibleTiles).map(tile => (
-          <div key={tile.id} className="w-full flex-shrink-0">
-            <WildBountyTile
-              symbol={tile.symbol}
-              isGold={tile.isGold}
-              isWinning={tile.isWinning}
-              transformedToWild={tile.transformedToWild}
-              animationPhase={isSpinning || isRolling ? 'idle' : animationPhase}
-            />
-          </div>
-        ))}
+        {(isSpinning || isRolling ? tapeTiles : visibleTiles).map((tile, rowIdx) => {
+          const fall = !isSpinning && !isRolling && fallDistances ? fallDistances[rowIdx] || 0 : 0;
+          const isFallingTile = fall > 0 && (cascadeFalling || (tileOffsets[rowIdx] || 0) !== 0);
+          const phase = isSpinning || isRolling ? 'idle' : animationPhase;
+          return (
+            <div
+              key={tile.id}
+              className="w-full flex-shrink-0"
+              style={
+                isFallingTile
+                  ? {
+                      transform: `translateY(${tileOffsets[rowIdx] || 0}px)`,
+                      transition: cascadeFalling
+                        ? 'transform 340ms cubic-bezier(0.33, 0.66, 0.41, 1)'
+                        : 'none'
+                    }
+                  : { transform: 'none', transition: 'none' }
+              }
+            >
+              {renderTile ? (
+                renderTile(tile, phase)
+              ) : (
+                <WildBountyTile
+                  symbol={tile.symbol}
+                  isGold={tile.isGold}
+                  isWinning={tile.isWinning}
+                  transformedToWild={tile.transformedToWild}
+                  animationPhase={phase}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

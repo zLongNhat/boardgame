@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { SlotsHubView } from '../components/slots/SlotsHubView';
 import { WildBountySlot } from '../components/slots/WildBountySlot';
+import { MahjongWays2Slot } from '../components/slots/MahjongWays2Slot';
+import { MahjongWaysSlot } from '../components/slots/MahjongWaysSlot';
 
 export const SlotsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -37,6 +39,10 @@ export const SlotsPage: React.FC = () => {
 
           {id === 'wild-bounty-showdown' ? (
             <WildBountySlot />
+          ) : id === 'mahjong-ways-2' ? (
+            <MahjongWays2Slot />
+          ) : id === 'mahjong-ways' ? (
+            <MahjongWaysSlot />
           ) : (
             <div className="text-center py-16 text-gray-400">
               <p>Trò chơi đang phát triển và sẽ sớm ra mắt!</p>

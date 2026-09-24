@@ -42,18 +42,32 @@ const FEATURED_GAMES: (SlotGameInfo & { status: 'live' | 'upcoming'; badge: stri
     features: ['Respin Khóa Cuộn', 'Hệ Số Nhân x10 Toàn Màn Hình']
   },
   {
+    id: 'mahjong-ways',
+    name: 'Mahjong Ways',
+    tagline: 'Mạt Chược Gốc PG Soft - 1,024 Ways, Top Phát 100x',
+    provider: 'PG Soft',
+    banner: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+    reels: [4, 4, 4, 4, 4],
+    rtp: '96.92%',
+    maxWin: '25,000x',
+    volatility: 'Trung bình',
+    status: 'live',
+    badge: 'BẢN GỐC 🀄',
+    features: ['1,024 Cách Thắng', 'Mạ Vàng Hóa WILD', 'Hệ Số x1 ➔ x5']
+  },
+  {
     id: 'mahjong-ways-2',
     name: 'Mahjong Ways 2',
-    tagline: 'Mạt Chược Huyền Bí 2 - Nổ Hũ Biến Wild Mạ Vàng',
+    tagline: 'Mạt Chược PG Soft - 2,000 Ways, Hệ Số x5 & Free Spins x10',
     provider: 'PG Soft',
     banner: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
     reels: [4, 5, 5, 5, 4],
     rtp: '96.95%',
-    maxWin: '100,000x',
+    maxWin: '25,000x',
     volatility: 'Trung bình',
-    status: 'upcoming',
-    badge: 'SẮP RA MẮT ⏳',
-    features: ['Biến Đổi Mạ Vàng', 'Free Spins Multiplier x10']
+    status: 'live',
+    badge: 'ĐANG HOT 🀄',
+    features: ['2,000 Cách Thắng', 'Mạ Vàng Hóa WILD', 'Hệ Số x1 ➔ x5']
   },
   {
     id: 'treasures-of-aztec',
@@ -141,7 +155,7 @@ export const SlotsHubView: React.FC<Props> = ({ onSelectGame }) => {
                 : 'bg-gray-900 text-gray-400 hover:text-white border border-transparent'
             }`}
           >
-            Đang Hoạt Động (1)
+            Đang Hoạt Động (3)
           </button>
           <button
             onClick={() => setFilter('pgsoft')}

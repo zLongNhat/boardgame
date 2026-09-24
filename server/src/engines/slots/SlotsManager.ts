@@ -1,10 +1,14 @@
 import { UserManager } from '../../auth/UserManager';
 import { SlotGameInfo, SpinResult } from './types';
 import { WildBountyEngine } from './WildBountyEngine';
+import { MahjongWays2Engine } from './MahjongWays2Engine';
+import { MahjongWaysEngine } from './MahjongWaysEngine';
 
 export class SlotsManager {
   private userManager: UserManager;
   private wildBountyEngine: WildBountyEngine;
+  private mahjong2Engine: MahjongWays2Engine;
+  private mahjongEngine: MahjongWaysEngine;
 
   private games: SlotGameInfo[] = [
     {
@@ -39,22 +43,48 @@ export class SlotsManager {
       features: ['Respin Khóa Cuộn May Mắn', 'Hệ Số Nhân x10 Toàn Bảng']
     },
     {
+      id: 'mahjong-ways',
+      name: 'Mahjong Ways',
+      tagline: 'Mạt Chược Gốc PG Soft - 1,024 Ways, Top Phát 100x!',
+      provider: 'Pocket Games Soft (PG Soft)',
+      banner: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+      reels: [4, 4, 4, 4, 4],
+      rtp: '96.92%',
+      maxWin: '25,000x',
+      volatility: 'Trung bình',
+      features: [
+        '1,024 Cách Chiến Thắng',
+        'Nổ Liên Hoàn (Cascading Reels)',
+        'Mạ Vàng Hóa WILD (cuộn 2-4)',
+        'Hệ Số x1 ➔ x2 ➔ x3 ➔ x5',
+        'Free Spins 10 lượt, hệ số x2 ➔ x10'
+      ]
+    },
+    {
       id: 'mahjong-ways-2',
       name: 'Mahjong Ways 2',
-      tagline: 'Mạt Chược Huyền Bí 2 - Nổ Hũ Biến Wild Mạ Vàng (Sắp Ra Mắt)',
+      tagline: 'Mạt Chược PG Soft - 2,000 Ways, Nhân Hệ Số x5 & Free Spins x10!',
       provider: 'Pocket Games Soft (PG Soft)',
       banner: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
       reels: [4, 5, 5, 5, 4],
       rtp: '96.95%',
-      maxWin: '100,000x',
+      maxWin: '25,000x',
       volatility: 'Trung bình',
-      features: ['Biến Đổi Mạ Vàng', 'Multiplier x10 Free Spins']
+      features: [
+        '2,000 Cách Chiến Thắng',
+        'Nổ Liên Hoàn (Cascading Reels)',
+        'Mạ Vàng Hóa WILD (cuộn 2-4)',
+        'Hệ Số x1 ➔ x2 ➔ x3 ➔ x5',
+        'Free Spins 10 lượt, hệ số x2 ➔ x10'
+      ]
     }
   ];
 
   constructor(userManager: UserManager) {
     this.userManager = userManager;
     this.wildBountyEngine = new WildBountyEngine(userManager);
+    this.mahjong2Engine = new MahjongWays2Engine(userManager);
+    this.mahjongEngine = new MahjongWaysEngine(userManager);
   }
 
   public getGames(): SlotGameInfo[] {
@@ -69,6 +99,12 @@ export class SlotsManager {
     if (slotId === 'wild-bounty-showdown') {
       return this.wildBountyEngine.getFreeSpins(userId);
     }
+    if (slotId === 'mahjong-ways-2') {
+      return this.mahjong2Engine.getFreeSpins(userId);
+    }
+    if (slotId === 'mahjong-ways') {
+      return this.mahjongEngine.getFreeSpins(userId);
+    }
     return null;
   }
 
@@ -80,6 +116,12 @@ export class SlotsManager {
   ): { success: boolean; result?: SpinResult; message?: string } {
     if (slotId === 'wild-bounty-showdown') {
       return this.wildBountyEngine.spin(userId, betAmount, options);
+    }
+    if (slotId === 'mahjong-ways-2') {
+      return this.mahjong2Engine.spin(userId, betAmount, options);
+    }
+    if (slotId === 'mahjong-ways') {
+      return this.mahjongEngine.spin(userId, betAmount, options);
     }
     return { success: false, message: 'Game slot chưa được hỗ trợ.' };
   }
