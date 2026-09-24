@@ -23,16 +23,16 @@ const PAYTABLE: Record<string, [number, number, number, number]> = {
   J: [1, 2, 4, 5]
 };
 
-// Weighted distribution for symbol generation
+// Weighted distribution for symbol generation - balanced for ~26% realistic slot hit rate
 const REGULAR_SYMBOLS: { symbol: SlotSymbolId; weight: number }[] = [
-  { symbol: 'J', weight: 26 },
-  { symbol: 'Q', weight: 24 },
-  { symbol: 'K', weight: 20 },
-  { symbol: 'A', weight: 18 },
-  { symbol: 'holster', weight: 14 },
-  { symbol: 'hat', weight: 12 },
-  { symbol: 'whiskey', weight: 9 },
-  { symbol: 'cowgirl', weight: 6 }
+  { symbol: 'J', weight: 16 },
+  { symbol: 'Q', weight: 15 },
+  { symbol: 'K', weight: 14 },
+  { symbol: 'A', weight: 13 },
+  { symbol: 'holster', weight: 12 },
+  { symbol: 'hat', weight: 11 },
+  { symbol: 'whiskey', weight: 10 },
+  { symbol: 'cowgirl', weight: 8 }
 ];
 
 const TOTAL_REGULAR_WEIGHT = REGULAR_SYMBOLS.reduce((acc, s) => acc + s.weight, 0);
@@ -256,7 +256,7 @@ export class WildBountyEngine {
       for (let rowIdx = 0; rowIdx < height; rowIdx++) {
         // Can symbols on reels 1, 2, 3, 4 have gold frames? (Reels 2, 3, 4, 5 in 1-based indexing)
         const canHaveGold = colIdx >= 1 && colIdx <= 4;
-        const isGold = canHaveGold && Math.random() < 0.14; // ~14% chance of gold frame
+        const isGold = canHaveGold && Math.random() < 0.08; // ~8% chance of gold frame
 
         const symbol = this.rollSymbol(colIdx);
         col.push({
@@ -288,13 +288,13 @@ export class WildBountyEngine {
    * Randomly roll a symbol based on reel position and weight
    */
   private rollSymbol(colIdx: number): SlotSymbolId {
-    // Scatter chance: ~3.5% on each position
-    if (Math.random() < 0.035) {
+    // Scatter chance: ~2.2% on each position
+    if (Math.random() < 0.022) {
       return 'scatter';
     }
 
-    // Natural Wilds only spawn on reels 2, 3, 4, 5 (indices 1, 2, 3, 4) with ~4% rate
-    if (colIdx >= 1 && colIdx <= 4 && Math.random() < 0.04) {
+    // Natural Wilds only spawn on reels 2, 3, 4, 5 (indices 1, 2, 3, 4) with ~2% rate
+    if (colIdx >= 1 && colIdx <= 4 && Math.random() < 0.02) {
       return 'wild';
     }
 
@@ -456,7 +456,7 @@ export class WildBountyEngine {
 
       for (let r = 0; r < needed; r++) {
         const canHaveGold = colIdx >= 1 && colIdx <= 4;
-        const isGold = canHaveGold && Math.random() < 0.12;
+        const isGold = canHaveGold && Math.random() < 0.08;
         const symbol = this.rollSymbol(colIdx);
 
         newTiles.push({

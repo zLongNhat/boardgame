@@ -15,7 +15,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useGameSocketContext } from '../../hooks/GameSocketContext';
 import { CascadeStep, FreeSpinsState, SpinResult } from '../../types/game';
-import { WildBountyTile, TileAnimationPhase } from './WildBountySymbols';
+import { TileAnimationPhase } from './WildBountySymbols';
+import { ReelColumnView } from './ReelColumnView';
 
 const REEL_HEIGHTS = [3, 4, 5, 5, 4, 3];
 const MULTIPLIERS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024];
@@ -178,6 +179,69 @@ class WesternSoundFX {
       });
     } catch {}
   }
+
+  playReelClack(colIdx: number) {
+    if (!this.enabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const baseFreq = 140 + colIdx * 15;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.06);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.06);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.06);
+    } catch {}
+  }
+
+  playScatterLand(scatterIndex: number) {
+    if (!this.enabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    try {
+      const freqs = [523.25, 659.25, 783.99, 1046.5];
+      const targetFreq = freqs[Math.min(scatterIndex, freqs.length - 1)];
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(targetFreq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.35);
+    } catch {}
+  }
+
+  playAnticipation() {
+    if (!this.enabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(440, ctx.currentTime + 0.6);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.6);
+    } catch {}
+  }
 }
 
 const soundFX = new WesternSoundFX();
@@ -212,6 +276,49 @@ export const WildBountySlot: React.FC = () => {
   // Shatter & Cascade animation states
   const [tileAnimationPhase, setTileAnimationPhase] = useState<TileAnimationPhase>('idle');
   const [isScreenShaking, setIsScreenShaking] = useState(false);
+
+  // Top-to-Bottom Reel Rolling & Scatter Drop states
+  const [isReelsRolling, setIsReelsRolling] = useState(false);
+  const [anticipatingCols, setAnticipatingCols] = useState<number[]>([]);
+  const [landedScattersCount, setLandedScattersCount] = useState(0);
+  const [reelSpinDurations, setReelSpinDurations] = useState<number[]>([500, 750, 1000, 1250, 1500, 1750]);
+
+  const pendingSpinResultRef = useRef<SpinResult | null>(null);
+  const scattersCountRef = useRef(0);
+  const stoppedCountRef = useRef(0);
+
+  // Staggered reel landing handler
+  const handleReelStop = (colIdx: number) => {
+    soundFX.playReelClack(colIdx);
+    stoppedCountRef.current++;
+
+    const result = pendingSpinResultRef.current;
+    if (!result) return;
+
+    // Check if any scatter landed on this stopped column
+    const scattersInThisCol = result.cascades[0].grid[colIdx].filter(t => t.symbol === 'scatter').length;
+    if (scattersInThisCol > 0) {
+      scattersCountRef.current += scattersInThisCol;
+      setLandedScattersCount(scattersCountRef.current);
+      soundFX.playScatterLand(scattersCountRef.current);
+
+      // If 2 scatters have landed and there are remaining reels, trigger anticipation!
+      if (scattersCountRef.current >= 2 && colIdx < 5) {
+        const remaining = Array.from({ length: 5 - colIdx }, (_, i) => colIdx + 1 + i);
+        setAnticipatingCols(remaining);
+        soundFX.playAnticipation();
+      }
+    }
+
+    // When all 6 reels have landed
+    if (stoppedCountRef.current >= 6) {
+      setTimeout(() => {
+        setIsReelsRolling(false);
+        setAnticipatingCols([]);
+        animateCascades(result);
+      }, turbo ? 80 : 220);
+    }
+  };
 
   // Modals
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -253,6 +360,10 @@ export const WildBountySlot: React.FC = () => {
       return;
     }
 
+    scattersCountRef.current = 0;
+    stoppedCountRef.current = 0;
+    setLandedScattersCount(0);
+    setAnticipatingCols([]);
     setIsSpinning(true);
     setLastWinAmount(0);
     setActiveWinningWaysCount(0);
@@ -281,7 +392,17 @@ export const WildBountySlot: React.FC = () => {
         }
 
         const spinResult = res.result;
-        animateCascades(spinResult);
+        pendingSpinResultRef.current = spinResult;
+
+        // Base staggered durations for the 6 rolling strips falling from top
+        const baseDurations = turbo
+          ? [180, 290, 400, 510, 620, 730]
+          : [500, 750, 1000, 1250, 1500, 1750];
+        setReelSpinDurations(baseDurations);
+
+        // Put target symbols in currentGrid and roll strips
+        setCurrentGrid(spinResult.cascades[0].grid);
+        setIsReelsRolling(true);
       }
     );
   };
@@ -491,25 +612,41 @@ export const WildBountySlot: React.FC = () => {
           <div className="absolute bottom-1 left-1 w-3 h-3 border-b-2 border-l-2 border-amber-400 pointer-events-none" />
           <div className="absolute bottom-1 right-1 w-3 h-3 border-b-2 border-r-2 border-amber-400 pointer-events-none" />
 
-          {/* 6 Staggered Reels */}
-          <div className="grid grid-cols-6 gap-1.5 sm:gap-2 items-center min-h-[320px] sm:min-h-[420px]">
-            {currentGrid.map((column, colIdx) => (
+          {/* Scatter Landing Live Counter Banner (Trôi từ trên xuống cũng tính) */}
+          {landedScattersCount > 0 && (
+            <div className="mb-2 flex items-center justify-center">
               <div
-                key={colIdx}
-                className="flex flex-col gap-1.5 sm:gap-2 justify-center h-full bg-black/40 rounded-xl p-1 border border-amber-900/30 shadow-inner"
+                className={`px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5 shadow-lg transition-all ${
+                  landedScattersCount >= 3
+                    ? 'bg-gradient-to-r from-yellow-400 via-rose-500 to-amber-500 text-gray-950 animate-bounce ring-2 ring-yellow-300 shadow-[0_0_20px_rgba(244,63,94,0.8)]'
+                    : 'bg-rose-950/90 border border-rose-500 text-rose-200 animate-pulse'
+                }`}
               >
-                {column.map(tile => (
-                  <div key={tile.id} className="w-full flex-1">
-                    <WildBountyTile
-                      symbol={tile.symbol}
-                      isGold={tile.isGold}
-                      isWinning={tile.isWinning}
-                      transformedToWild={tile.transformedToWild}
-                      animationPhase={tileAnimationPhase}
-                    />
-                  </div>
-                ))}
+                <span>🗝️</span>
+                <span>SCATTERS RƠI: {landedScattersCount} / 3</span>
+                {landedScattersCount >= 3 ? (
+                  <span className="font-extrabold uppercase">— KÍCH HOẠT FREE SPINS! 🔥</span>
+                ) : (
+                  <span className="text-[10px] text-rose-300">(Cần thêm {3 - landedScattersCount})</span>
+                )}
               </div>
+            </div>
+          )}
+
+          {/* 6 Staggered Reels with Uniform Tile Sizing */}
+          <div className="grid grid-cols-6 gap-1.5 sm:gap-2 items-center justify-center">
+            {currentGrid.map((column, colIdx) => (
+              <ReelColumnView
+                key={colIdx}
+                colIdx={colIdx}
+                height={REEL_HEIGHTS[colIdx]}
+                visibleTiles={column}
+                isSpinning={isReelsRolling}
+                spinDuration={reelSpinDurations[colIdx] || 600}
+                isAnticipating={anticipatingCols.includes(colIdx)}
+                animationPhase={tileAnimationPhase}
+                onReelStop={handleReelStop}
+              />
             ))}
           </div>
 

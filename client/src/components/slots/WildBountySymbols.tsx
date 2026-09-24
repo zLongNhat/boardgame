@@ -122,7 +122,7 @@ export const WildBountyTile: React.FC<SymbolProps> = ({
 
   return (
     <div
-      className={`relative w-full h-full min-h-[58px] sm:min-h-[68px] md:min-h-[76px] rounded-xl border flex flex-col items-center justify-center p-1 select-none overflow-hidden bg-gradient-to-b ${
+      className={`relative w-full h-[62px] sm:h-[72px] md:h-[82px] flex-shrink-0 rounded-xl border flex flex-col items-center justify-center p-1 select-none overflow-hidden bg-gradient-to-b ${
         details.bg
       } ${
         isShattering && !isGold
