@@ -248,6 +248,8 @@ app.use(express.static(clientDistPath));
 
 // Fallback all non-API routes to client index.html for SPA routing
 app.get('*', (_req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Content-Disposition', 'inline');
   res.sendFile(path.join(clientDistPath, 'index.html'), (err) => {
     if (err) {
       res.status(200).send('OmniDeck Server is running. Client build will be served here once built.');

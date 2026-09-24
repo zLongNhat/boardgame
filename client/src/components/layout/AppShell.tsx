@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Gamepad2,
   Dices,
@@ -112,6 +112,7 @@ export const AppShell: React.FC = () => {
   const { user, logout } = useAuth();
   const { t } = useLang();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -177,20 +178,25 @@ export const AppShell: React.FC = () => {
               {section.items.map((tab) => {
                 const Icon = tab.icon;
                 const label = t(tab.label);
+                const isActive = tab.end
+                  ? location.pathname === tab.to
+                  : location.pathname === tab.to || location.pathname.startsWith(`${tab.to}/`);
+
                 return (
-                  <NavLink
+                  <button
                     key={tab.to}
-                    to={tab.to}
-                    end={tab.end}
-                    onClick={() => setMobileMenuOpen(false)}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate(tab.to);
+                      setMobileMenuOpen(false);
+                    }}
                     title={label}
-                    className={({ isActive }) =>
-                      `flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
-                        isActive
-                          ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white border-transparent shadow-lg shadow-purple-900/30'
-                          : 'bg-transparent text-gray-300 border-transparent hover:bg-gray-800/70 hover:text-white'
-                      }`
-                    }
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer text-left ${
+                      isActive
+                        ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white border-transparent shadow-lg shadow-purple-900/30'
+                        : 'bg-transparent text-gray-300 border-transparent hover:bg-gray-800/70 hover:text-white'
+                    }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Icon className="w-4 h-4 flex-shrink-0" />
@@ -206,7 +212,7 @@ export const AppShell: React.FC = () => {
                         {tab.to === '/inventory' && inventoryCount > 0 ? `${inventoryCount}` : tab.badge}
                       </span>
                     )}
-                  </NavLink>
+                  </button>
                 );
               })}
             </div>
