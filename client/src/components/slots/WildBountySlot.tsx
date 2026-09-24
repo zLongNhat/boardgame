@@ -15,7 +15,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useGameSocketContext } from '../../hooks/GameSocketContext';
 import { CascadeStep, FreeSpinsState, SpinResult } from '../../types/game';
-import { WildBountyTile } from './WildBountySymbols';
+import { WildBountyTile, TileAnimationPhase } from './WildBountySymbols';
 
 const REEL_HEIGHTS = [3, 4, 5, 5, 4, 3];
 const MULTIPLIERS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024];
@@ -86,20 +86,95 @@ class WesternSoundFX {
     if (!this.enabled) return;
     this.initCtx();
     if (!this.ctx) return;
+    const ctx = this.ctx;
     try {
       const notes = [523.25, 659.25, 783.99, 1046.5];
       notes.forEach((freq, idx) => {
-        const osc = this.ctx!.createOscillator();
-        const gain = this.ctx!.createGain();
-        const time = this.ctx!.currentTime + idx * 0.08;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const time = ctx.currentTime + idx * 0.08;
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, time);
         gain.gain.setValueAtTime(0.15, time);
         gain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
         osc.connect(gain);
-        gain.connect(this.ctx!.destination);
+        gain.connect(ctx.destination);
         osc.start(time);
         osc.stop(time + 0.2);
+      });
+    } catch {}
+  }
+
+  playShatter() {
+    if (!this.enabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    try {
+      const now = ctx.currentTime;
+      const bufferSize = ctx.sampleRate * 0.14;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(1400, now);
+      filter.frequency.exponentialRampToValueAtTime(3200, now + 0.14);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      noise.start(now);
+    } catch {}
+  }
+
+  playDrop() {
+    if (!this.enabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(160, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.08);
+    } catch {}
+  }
+
+  playGoldMorph() {
+    if (!this.enabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    try {
+      const notes = [659.25, 880, 1046.5, 1318.5];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const time = ctx.currentTime + idx * 0.05;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, time);
+        gain.gain.setValueAtTime(0.18, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.18);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(time);
+        osc.stop(time + 0.18);
       });
     } catch {}
   }
@@ -133,6 +208,10 @@ export const WildBountySlot: React.FC = () => {
   const [activeMultiplier, setActiveMultiplier] = useState(1);
   const [lastWinAmount, setLastWinAmount] = useState(0);
   const [activeWinningWaysCount, setActiveWinningWaysCount] = useState(0);
+
+  // Shatter & Cascade animation states
+  const [tileAnimationPhase, setTileAnimationPhase] = useState<TileAnimationPhase>('idle');
+  const [isScreenShaking, setIsScreenShaking] = useState(false);
 
   // Modals
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -207,9 +286,8 @@ export const WildBountySlot: React.FC = () => {
     );
   };
 
-  // Play through cascading steps
+  // Play through cascading steps with authentic PG Soft shatter & drop animations
   const animateCascades = async (spinResult: SpinResult) => {
-    const delay = turbo ? 260 : 650;
     const cascades = spinResult.cascades;
 
     for (let i = 0; i < cascades.length; i++) {
@@ -218,13 +296,38 @@ export const WildBountySlot: React.FC = () => {
       setActiveMultiplier(step.multiplier);
       setActiveWinningWaysCount(step.winningWays.length);
 
-      if (step.stepWin > 0) {
-        soundFX.playGunshot();
+      if (step.winningWays.length > 0) {
+        // Phase 1: Items connect into winning paylines with golden pulsing aura
+        setTileAnimationPhase('connecting');
+        soundFX.playWin();
         setLastWinAmount(step.totalWinSoFar);
-      }
+        await new Promise(r => setTimeout(r, turbo ? 200 : 420));
 
-      await new Promise(r => setTimeout(r, delay));
+        // Phase 2: Gunshot impact strike & items shatter into glass fragments!
+        setTileAnimationPhase('shattering');
+        setIsScreenShaking(true);
+        soundFX.playGunshot();
+        soundFX.playShatter();
+
+        const hasGoldWinner = step.grid.some(col => col.some(t => t.isWinning && t.isGold));
+        if (hasGoldWinner) {
+          soundFX.playGoldMorph();
+        }
+
+        setTimeout(() => setIsScreenShaking(false), 240);
+        await new Promise(r => setTimeout(r, turbo ? 260 : 480));
+
+        // Phase 3: Surviving tiles & new symbols drop with spring bounce
+        setTileAnimationPhase('dropped');
+        soundFX.playDrop();
+        await new Promise(r => setTimeout(r, turbo ? 180 : 320));
+      } else {
+        setTileAnimationPhase('idle');
+        await new Promise(r => setTimeout(r, turbo ? 140 : 250));
+      }
     }
+
+    setTileAnimationPhase('idle');
 
     // Finalize spin
     setLastWinAmount(spinResult.totalWin);
@@ -377,7 +480,11 @@ export const WildBountySlot: React.FC = () => {
 
       {/* Western Saloon 6-Reel Grid Frame (3-4-5-5-4-3) */}
       <div className="w-full px-2 sm:px-4">
-        <div className="relative p-2 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-950/60 via-stone-900/90 to-black border-2 border-amber-700/60 shadow-[0_10px_35px_rgba(0,0,0,0.8)]">
+        <div
+          className={`relative p-2 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-950/60 via-stone-900/90 to-black border-2 border-amber-700/60 shadow-[0_10px_35px_rgba(0,0,0,0.8)] transition-transform duration-100 ${
+            isScreenShaking ? 'animate-screen-shake' : ''
+          }`}
+        >
           {/* Wood corner accents */}
           <div className="absolute top-1 left-1 w-3 h-3 border-t-2 border-l-2 border-amber-400 pointer-events-none" />
           <div className="absolute top-1 right-1 w-3 h-3 border-t-2 border-r-2 border-amber-400 pointer-events-none" />
@@ -398,6 +505,7 @@ export const WildBountySlot: React.FC = () => {
                       isGold={tile.isGold}
                       isWinning={tile.isWinning}
                       transformedToWild={tile.transformedToWild}
+                      animationPhase={tileAnimationPhase}
                     />
                   </div>
                 ))}
