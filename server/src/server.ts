@@ -286,3 +286,12 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.exit(0);
   });
 }
+
+process.on('uncaughtException', (err) => {
+  console.error('[OmniDeck] Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[OmniDeck] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
