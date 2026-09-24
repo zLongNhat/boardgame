@@ -14,6 +14,9 @@ import { TaiXiuPage } from './pages/TaiXiuPage';
 import { MinesPage } from './pages/MinesPage';
 import { GoalsPage } from './pages/GoalsPage';
 import { RoulettePage, AviatorPage, ChickenPage, HiloPage, CoinflipPage, RpsPage } from './pages/CasinoPages';
+import { CasesPage } from './pages/CasesPage';
+import { UpgradePage } from './pages/UpgradePage';
+import { InventoryPage } from './pages/InventoryPage';
 
 /**
  * OmniDeck Arena — URL Router.
@@ -24,6 +27,9 @@ import { RoulettePage, AviatorPage, ChickenPage, HiloPage, CoinflipPage, RpsPage
  * - /room-id?id=XXX .... Alias đúng yêu cầu /room-id=?
  * - /hustle ............ Đi Làm kiếm coins
  * - /leaderboard ....... Bảng xếp hạng
+ * - /cases ............. Mở Hòm CS2
+ * - /upgrade ........... Nâng Cấp SkinClub
+ * - /inventory ......... Kho Đồ Skin
  * - /tai-xiu /mines /goals ... Casino minh bạch
  */
 export const App: React.FC = () => {
@@ -43,6 +49,9 @@ export const App: React.FC = () => {
               <Route path="/room-id" element={<RoomPage />} />
               <Route path="/hustle" element={<HustlePage />} />
               <Route path="/leaderboard" element={<LeaderboardPage />} />
+              <Route path="/cases" element={<CasesPage />} />
+              <Route path="/upgrade" element={<UpgradePage />} />
+              <Route path="/inventory" element={<InventoryPage />} />
               {/* Giữ tương thích điều hướng cũ */}
               <Route path="/lobby" element={<Navigate to="/play" replace />} />
               <Route path="/work" element={<Navigate to="/hustle" replace />} />

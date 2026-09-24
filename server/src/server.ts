@@ -10,6 +10,8 @@ import { TaiXiuEngine } from './engines/tai-xiu/TaiXiuEngine';
 import { MinesEngine } from './engines/mines/MinesEngine';
 import { GoalsEngine } from './engines/goals/GoalsEngine';
 import { CasinoEngine } from './engines/casino/CasinoEngine';
+import { CaseEngine } from './engines/cases/CaseEngine';
+import { UpgradeEngine } from './engines/upgrade/UpgradeEngine';
 import { registerSocketHandlers } from './sockets/gameHandlers';
 import { flushRemoteSaves } from './storage/redisRest';
 
@@ -33,8 +35,21 @@ const taiXiuEngine = new TaiXiuEngine(userManager);
 const minesEngine = new MinesEngine(userManager);
 const goalsEngine = new GoalsEngine(userManager);
 const casinoEngine = new CasinoEngine(userManager);
+const caseEngine = new CaseEngine(userManager);
+const upgradeEngine = new UpgradeEngine(userManager);
 
-registerSocketHandlers(io, roomManager, userManager, workManager, taiXiuEngine, minesEngine, goalsEngine, casinoEngine);
+registerSocketHandlers(
+  io,
+  roomManager,
+  userManager,
+  workManager,
+  taiXiuEngine,
+  minesEngine,
+  goalsEngine,
+  casinoEngine,
+  caseEngine,
+  upgradeEngine
+);
 
 // Start Aviator shared rounds
 casinoEngine.aviatorStart();
@@ -132,6 +147,25 @@ app.get('/api/user/balance', (req, res) => {
 app.get('/api/tai-xiu/history', (_req, res) => {
   const state = taiXiuEngine.getState();
   res.json({ success: true, history: state.history });
+});
+
+// Cases: Get all case definitions
+app.get('/api/cases', (_req, res) => {
+  res.json({ success: true, cases: caseEngine.getCases() });
+});
+
+// Inventory: Get user inventory
+app.get('/api/inventory', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  const token = authHeader.substring(7);
+  const user = userManager.getUserByToken(token);
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'Invalid session' });
+  }
+  res.json({ success: true, inventory: userManager.getInventory(user.id) });
 });
 
 // Serve client build in production

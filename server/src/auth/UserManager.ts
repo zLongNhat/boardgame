@@ -3,6 +3,19 @@ import fs from 'fs';
 import path from 'path';
 import { PERSISTED_KEYS, redisConfigured, redisGet, scheduleRemoteSave } from '../storage/redisRest';
 
+export type ItemRarity = 'white' | 'blue' | 'purple' | 'red' | 'gold';
+
+export interface InventoryItem {
+  id: string; // unique instance id
+  itemId: string; // template id
+  name: string;
+  rarity: ItemRarity;
+  value: number; // coin sell value
+  icon: string;
+  obtainedAt: number;
+  caseType?: string;
+}
+
 export interface UserStats {
   unoWins: number;
   explodingKittensWins: number;
@@ -20,6 +33,7 @@ export interface User {
   avatar: string;
   createdAt: number;
   balance: number;
+  inventory?: InventoryItem[];
   stats: UserStats;
 }
 
@@ -29,6 +43,7 @@ export interface PublicUser {
   displayName: string;
   avatar: string;
   balance: number;
+  inventory?: InventoryItem[];
   stats: UserStats;
 }
 
@@ -465,10 +480,95 @@ export class UserManager {
     return user?.balance ?? 0;
   }
 
+  // ========== INVENTORY MANAGEMENT ==========
+
+  public getInventory(userId: string): InventoryItem[] {
+    const user = this.users.get(userId);
+    return user?.inventory ? [...user.inventory] : [];
+  }
+
+  public addItemToInventory(userId: string, itemData: Omit<InventoryItem, 'id' | 'obtainedAt'>): { success: boolean; item?: InventoryItem; message?: string } {
+    const user = this.users.get(userId);
+    if (!user) return { success: false, message: 'User not found' };
+
+    if (!user.inventory) {
+      user.inventory = [];
+    }
+
+    const newItem: InventoryItem = {
+      ...itemData,
+      id: crypto.randomUUID(),
+      obtainedAt: Date.now()
+    };
+
+    user.inventory.push(newItem);
+    this.saveUsers();
+    console.log(`[Inventory] Added ${newItem.name} (${newItem.rarity}, ${newItem.value} 🪙) to ${user.displayName}'s inventory.`);
+    return { success: true, item: newItem };
+  }
+
+  public sellItem(userId: string, itemInstanceId: string): { success: boolean; earned?: number; newBalance?: number; item?: InventoryItem; message?: string } {
+    const user = this.users.get(userId);
+    if (!user) return { success: false, message: 'User not found' };
+    if (!user.inventory || user.inventory.length === 0) return { success: false, message: 'Kho đồ trống' };
+
+    const idx = user.inventory.findIndex(it => it.id === itemInstanceId);
+    if (idx === -1) return { success: false, message: 'Không tìm thấy vật phẩm' };
+
+    const [removed] = user.inventory.splice(idx, 1);
+    const earned = removed.value || 0;
+    user.balance = (user.balance || 0) + earned;
+    this.saveUsers();
+    console.log(`[Inventory] Sold ${removed.name} for +${earned} 🪙 by ${user.displayName}. New balance: ${user.balance}`);
+
+    return {
+      success: true,
+      earned,
+      newBalance: user.balance,
+      item: removed
+    };
+  }
+
+  public sellAllItems(userId: string): { success: boolean; count?: number; earned?: number; newBalance?: number; message?: string } {
+    const user = this.users.get(userId);
+    if (!user) return { success: false, message: 'User not found' };
+    if (!user.inventory || user.inventory.length === 0) return { success: false, message: 'Kho đồ trống' };
+
+    const count = user.inventory.length;
+    const earned = user.inventory.reduce((sum, it) => sum + (it.value || 0), 0);
+    user.inventory = [];
+    user.balance = (user.balance || 0) + earned;
+    this.saveUsers();
+    console.log(`[Inventory] Sold all ${count} items for +${earned} 🪙 by ${user.displayName}. New balance: ${user.balance}`);
+
+    return {
+      success: true,
+      count,
+      earned,
+      newBalance: user.balance
+    };
+  }
+
+  public consumeItem(userId: string, itemInstanceId: string): { success: boolean; item?: InventoryItem; message?: string } {
+    const user = this.users.get(userId);
+    if (!user) return { success: false, message: 'User not found' };
+    if (!user.inventory || user.inventory.length === 0) return { success: false, message: 'Kho đồ trống' };
+
+    const idx = user.inventory.findIndex(it => it.id === itemInstanceId);
+    if (idx === -1) return { success: false, message: 'Không tìm thấy vật phẩm' };
+
+    const [consumed] = user.inventory.splice(idx, 1);
+    this.saveUsers();
+    return { success: true, item: consumed };
+  }
+
   // Migrate old users without balance field
   private migrateUserBalance(user: User): void {
     if (user.balance === undefined || user.balance === null) {
       user.balance = 500;
+    }
+    if (!user.inventory) {
+      user.inventory = [];
     }
   }
 
@@ -480,6 +580,7 @@ export class UserManager {
       displayName: user.displayName,
       avatar: user.avatar,
       balance: user.balance ?? 500,
+      inventory: user.inventory ? [...user.inventory] : [],
       stats: { ...user.stats }
     };
   }

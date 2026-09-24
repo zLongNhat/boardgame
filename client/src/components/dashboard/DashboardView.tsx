@@ -16,6 +16,8 @@ import {
   Bird,
   ArrowUpDown,
   Hand,
+  Package,
+  Zap,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -44,6 +46,9 @@ const GAME_CARDS: Array<{
   { id: 'mines', title: 'Mines', icon: Pickaxe, descKey: 'card.mines.desc', badges: ['Solo', '🪙'], bgGradient: 'from-cyan-500 to-blue-500', to: '/mines' },
   { id: 'goals', title: 'Goals', icon: Target, descKey: 'card.goals.desc', badges: ['Solo', '🪙'], bgGradient: 'from-green-500 to-lime-500', to: '/goals' },
   { id: 'hustle', title: 'Đi Làm', icon: Briefcase, descKey: 'card.hustle.desc', badges: ['Kiếm Tiền', 'FREE'], bgGradient: 'from-slate-600 to-zinc-500', to: '/hustle', pulse: true },
+  { id: 'cases', title: 'Mở Hòm CS2', icon: Package, descKey: 'card.cases.desc', badges: ['CS2 Skins', '🪙'], bgGradient: 'from-amber-600 to-orange-500', to: '/cases', pulse: true },
+  { id: 'upgrade', title: 'Nâng Cấp', icon: Zap, descKey: 'card.upgrade.desc', badges: ['SkinClub', '95% RTP'], bgGradient: 'from-purple-600 to-pink-500', to: '/upgrade' },
+  { id: 'inventory', title: 'Kho Đồ', icon: Package, descKey: 'card.inventory.desc', badges: ['Tài Sản', 'Bán Xu'], bgGradient: 'from-indigo-600 to-blue-500', to: '/inventory' },
   { id: 'roulette', title: 'Roulette', icon: CircleDot, descKey: 'card.roulette.desc', badges: ['Live Casino', '🪙'], bgGradient: 'from-emerald-600 to-teal-500', to: '/roulette' },
   { id: 'aviator', title: 'Aviator', icon: Plane, descKey: 'card.aviator.desc', badges: ['Live', '🪙'], bgGradient: 'from-sky-600 to-blue-500', to: '/aviator' },
   { id: 'chicken', title: 'Chicken Cross', icon: Bird, descKey: 'card.chicken.desc', badges: ['Solo', '🪙'], bgGradient: 'from-lime-600 to-green-500', to: '/chicken' },

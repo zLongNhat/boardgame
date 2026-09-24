@@ -6,6 +6,8 @@ import { TaiXiuEngine } from '../engines/tai-xiu/TaiXiuEngine';
 import { MinesEngine } from '../engines/mines/MinesEngine';
 import { GoalsEngine } from '../engines/goals/GoalsEngine';
 import { CasinoEngine } from '../engines/casino/CasinoEngine';
+import { CaseEngine } from '../engines/cases/CaseEngine';
+import { UpgradeEngine } from '../engines/upgrade/UpgradeEngine';
 
 export function registerSocketHandlers(
   io: Server,
@@ -15,7 +17,9 @@ export function registerSocketHandlers(
   taiXiuEngine?: TaiXiuEngine,
   minesEngine?: MinesEngine,
   goalsEngine?: GoalsEngine,
-  casinoEngine?: CasinoEngine
+  casinoEngine?: CasinoEngine,
+  caseEngine?: CaseEngine,
+  upgradeEngine?: UpgradeEngine
 ) {
   const formatPlayerDTO = (p: any) => ({
     id: p.id,
@@ -671,6 +675,98 @@ export function registerSocketHandlers(
         const { userId } = data || {};
         if (!userId) return callback({ success: false, message: 'Chưa đăng nhập' });
         callback(casinoEngine.aviatorCashout(userId));
+      });
+    }
+
+    // ========== CS2 CASE OPENING ==========
+    if (caseEngine) {
+      socket.on('cases:get', (_data: any, callback: Function) => {
+        if (typeof callback === 'function') {
+          callback({ success: true, cases: caseEngine.getCases() });
+        }
+      });
+
+      socket.on('cases:open', (data: any, callback: Function) => {
+        const { userId, caseId } = data || {};
+        if (!userId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Chưa đăng nhập.' });
+          return;
+        }
+        const result = caseEngine.openCase(userId, caseId);
+        if (result.success && result.newBalance !== undefined) {
+          socket.emit('balance_updated', { balance: result.newBalance });
+        }
+        if (typeof callback === 'function') {
+          callback(result);
+        }
+      });
+    }
+
+    // ========== INVENTORY SYSTEM ==========
+    socket.on('inventory:get', (data: any, callback: Function) => {
+      const { userId } = data || {};
+      if (!userId) {
+        if (typeof callback === 'function') callback({ success: false, message: 'Chưa đăng nhập.' });
+        return;
+      }
+      const inventory = userManager.getInventory(userId);
+      if (typeof callback === 'function') {
+        callback({ success: true, inventory });
+      }
+    });
+
+    socket.on('inventory:sell', (data: any, callback: Function) => {
+      const { userId, itemId } = data || {};
+      if (!userId || !itemId) {
+        if (typeof callback === 'function') callback({ success: false, message: 'Thiếu thông tin người chơi hoặc vật phẩm.' });
+        return;
+      }
+      const res = userManager.sellItem(userId, itemId);
+      if (res.success && res.newBalance !== undefined) {
+        socket.emit('balance_updated', { balance: res.newBalance });
+      }
+      if (typeof callback === 'function') {
+        callback(res);
+      }
+    });
+
+    socket.on('inventory:sell-all', (data: any, callback: Function) => {
+      const { userId } = data || {};
+      if (!userId) {
+        if (typeof callback === 'function') callback({ success: false, message: 'Chưa đăng nhập.' });
+        return;
+      }
+      const res = userManager.sellAllItems(userId);
+      if (res.success && res.newBalance !== undefined) {
+        socket.emit('balance_updated', { balance: res.newBalance });
+      }
+      if (typeof callback === 'function') {
+        callback(res);
+      }
+    });
+
+    // ========== SKINCLUB UPGRADE ==========
+    if (upgradeEngine) {
+      socket.on('upgrade:play', (data: any, callback: Function) => {
+        const { userId, betType, betAmount, itemInstanceId, targetValue, rollDirection } = data || {};
+        if (!userId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Chưa đăng nhập.' });
+          return;
+        }
+        const result = upgradeEngine.playUpgrade({
+          userId,
+          betType,
+          betAmount,
+          itemInstanceId,
+          targetValue,
+          rollDirection
+        });
+        if (result.success && result.newBalance !== undefined) {
+          socket.emit('balance_updated', { balance: result.newBalance });
+        }
+        if (typeof callback === 'function') {
+          callback(result);
+        }
       });
     }
   });

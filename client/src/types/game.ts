@@ -12,9 +12,70 @@ export type AppView =
   | 'leaderboard'
   | 'tai-xiu'
   | 'mines'
-  | 'goals';
+  | 'goals'
+  | 'cases'
+  | 'upgrade'
+  | 'inventory';
 export type UnoMode = 'classic' | 'no-mercy' | 'flex';
 export type UnoColor = 'red' | 'blue' | 'green' | 'yellow' | 'wild';
+
+export type ItemRarity = 'white' | 'blue' | 'purple' | 'red' | 'gold';
+
+export interface InventoryItem {
+  id: string; // unique instance id
+  itemId: string; // template id
+  name: string;
+  rarity: ItemRarity;
+  value: number; // coin sell value
+  icon: string;
+  obtainedAt: number;
+  caseType?: string;
+}
+
+export interface CaseItemTemplate {
+  itemId: string;
+  name: string;
+  rarity: ItemRarity;
+  value: number;
+  icon: string;
+  weaponType: string;
+}
+
+export interface CaseDefinition {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  icon: string;
+  badge: string;
+  gradient: string;
+  items: CaseItemTemplate[];
+}
+
+export interface CaseOpenResult {
+  success: boolean;
+  wonItem?: InventoryItem;
+  tape?: CaseItemTemplate[];
+  winningIndex?: number;
+  newBalance?: number;
+  message?: string;
+}
+
+export interface UpgradeResult {
+  success: boolean;
+  isWin?: boolean;
+  rollNumber?: number;
+  rollDegree?: number;
+  winChance?: number;
+  multiplier?: number;
+  betAmount?: number;
+  targetValue?: number;
+  rollDirection?: 'under' | 'over';
+  winningRange?: [number, number];
+  newBalance?: number;
+  consumedItemName?: string;
+  message?: string;
+}
 
 export interface UserStats {
   unoWins: number;
@@ -30,6 +91,7 @@ export interface PublicUser {
   displayName: string;
   avatar: string;
   balance: number;
+  inventory?: InventoryItem[];
   stats: UserStats;
 }
 
