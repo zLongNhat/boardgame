@@ -8,6 +8,7 @@ import { GoalsEngine } from '../engines/goals/GoalsEngine';
 import { CasinoEngine } from '../engines/casino/CasinoEngine';
 import { CaseEngine } from '../engines/cases/CaseEngine';
 import { UpgradeEngine } from '../engines/upgrade/UpgradeEngine';
+import { BattleEngine } from '../engines/cases/BattleEngine';
 
 export function registerSocketHandlers(
   io: Server,
@@ -19,7 +20,8 @@ export function registerSocketHandlers(
   goalsEngine?: GoalsEngine,
   casinoEngine?: CasinoEngine,
   caseEngine?: CaseEngine,
-  upgradeEngine?: UpgradeEngine
+  upgradeEngine?: UpgradeEngine,
+  battleEngine?: BattleEngine
 ) {
   const formatPlayerDTO = (p: any) => ({
     id: p.id,
@@ -766,6 +768,91 @@ export function registerSocketHandlers(
         }
         if (typeof callback === 'function') {
           callback(result);
+        }
+      });
+    }
+
+    // ========== CS2 CASE BATTLES ==========
+    if (battleEngine) {
+      socket.on('battle:list', (_data: any, callback: Function) => {
+        if (typeof callback === 'function') {
+          callback({ success: true, battles: battleEngine.listBattles() });
+        }
+      });
+
+      socket.on('battle:get', (data: any, callback: Function) => {
+        const { battleId } = data || {};
+        const battle = battleEngine.getBattle(battleId);
+        if (typeof callback === 'function') {
+          callback({ success: Boolean(battle), battle });
+        }
+      });
+
+      socket.on('battle:subscribe', (data: any) => {
+        const { battleId } = data || {};
+        if (battleId) {
+          socket.join(`battle:${battleId}`);
+        }
+      });
+
+      socket.on('battle:unsubscribe', (data: any) => {
+        const { battleId } = data || {};
+        if (battleId) {
+          socket.leave(`battle:${battleId}`);
+        }
+      });
+
+      socket.on('battle:create', (data: any, callback: Function) => {
+        const { creatorId, caseIds, maxPlayers, mode } = data || {};
+        if (!creatorId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Chưa đăng nhập.' });
+          return;
+        }
+        const res = battleEngine.createBattle(creatorId, caseIds, maxPlayers, mode);
+        if (res.success && res.battle) {
+          socket.join(`battle:${res.battle.id}`);
+          const newBalance = userManager.getBalance(creatorId);
+          socket.emit('balance_updated', { balance: newBalance });
+        }
+        if (typeof callback === 'function') {
+          callback(res);
+        }
+      });
+
+      socket.on('battle:join', (data: any, callback: Function) => {
+        const { battleId, userId } = data || {};
+        if (!userId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Chưa đăng nhập.' });
+          return;
+        }
+        const res = battleEngine.joinBattle(battleId, userId);
+        if (res.success && res.battle) {
+          socket.join(`battle:${battleId}`);
+          const newBalance = userManager.getBalance(userId);
+          socket.emit('balance_updated', { balance: newBalance });
+        }
+        if (typeof callback === 'function') {
+          callback(res);
+        }
+      });
+
+      socket.on('battle:add-bot', (data: any, callback: Function) => {
+        const { battleId, requesterId } = data || {};
+        const res = battleEngine.addBot(battleId, requesterId);
+        if (typeof callback === 'function') {
+          callback(res);
+        }
+      });
+
+      socket.on('battle:cancel', (data: any, callback: Function) => {
+        const { battleId, requesterId } = data || {};
+        const res = battleEngine.cancelBattle(battleId, requesterId);
+        if (res.success) {
+          const newBalance = userManager.getBalance(requesterId);
+          socket.emit('balance_updated', { balance: newBalance });
+        }
+        if (typeof callback === 'function') {
+          callback(res);
         }
       });
     }

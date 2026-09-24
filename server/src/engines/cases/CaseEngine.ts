@@ -193,4 +193,27 @@ export class CaseEngine {
       newBalance: this.userManager.getBalance(userId)
     };
   }
+
+  public rollItemForBattle(caseId: string): { wonTemplate: CaseItemTemplate; tape: CaseItemTemplate[]; winningIndex: number } | null {
+    const caseDef = this.getCaseById(caseId);
+    if (!caseDef) return null;
+
+    const winningRarity = this.rollRarity();
+    const wonTemplate = this.pickItemByRarity(caseDef, winningRarity);
+
+    const TAPE_LENGTH = 35;
+    const WINNING_INDEX = 30;
+    const tape: CaseItemTemplate[] = [];
+
+    for (let i = 0; i < TAPE_LENGTH; i++) {
+      if (i === WINNING_INDEX) {
+        tape.push(wonTemplate);
+      } else {
+        const r = this.rollRarity();
+        tape.push(this.pickItemByRarity(caseDef, r));
+      }
+    }
+
+    return { wonTemplate, tape, winningIndex: WINNING_INDEX };
+  }
 }

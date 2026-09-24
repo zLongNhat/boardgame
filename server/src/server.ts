@@ -12,6 +12,7 @@ import { GoalsEngine } from './engines/goals/GoalsEngine';
 import { CasinoEngine } from './engines/casino/CasinoEngine';
 import { CaseEngine } from './engines/cases/CaseEngine';
 import { UpgradeEngine } from './engines/upgrade/UpgradeEngine';
+import { BattleEngine } from './engines/cases/BattleEngine';
 import { registerSocketHandlers } from './sockets/gameHandlers';
 import { flushRemoteSaves } from './storage/redisRest';
 
@@ -37,6 +38,7 @@ const goalsEngine = new GoalsEngine(userManager);
 const casinoEngine = new CasinoEngine(userManager);
 const caseEngine = new CaseEngine(userManager);
 const upgradeEngine = new UpgradeEngine(userManager);
+const battleEngine = new BattleEngine(userManager, caseEngine);
 
 registerSocketHandlers(
   io,
@@ -48,8 +50,29 @@ registerSocketHandlers(
   goalsEngine,
   casinoEngine,
   caseEngine,
-  upgradeEngine
+  upgradeEngine,
+  battleEngine
 );
+
+// Wire Case Battle events to rooms and all sockets
+battleEngine.on('battle:updated', (room: any) => {
+  io.to(`battle:${room.id}`).emit('battle:updated', room);
+});
+battleEngine.on('battle:round-start', (data: any) => {
+  io.to(`battle:${data.battleId}`).emit('battle:round-start', data);
+});
+battleEngine.on('battle:round-end', (data: any) => {
+  io.to(`battle:${data.battleId}`).emit('battle:round-end', data);
+});
+battleEngine.on('battle:finished', (data: any) => {
+  io.to(`battle:${data.battleId}`).emit('battle:finished', data);
+});
+battleEngine.on('battle:cancelled', (data: any) => {
+  io.to(`battle:${data.battleId}`).emit('battle:cancelled', data);
+});
+battleEngine.on('battle:list-updated', () => {
+  io.emit('battle:list', battleEngine.listBattles());
+});
 
 // Start Aviator shared rounds
 casinoEngine.aviatorStart();
@@ -166,6 +189,19 @@ app.get('/api/inventory', (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid session' });
   }
   res.json({ success: true, inventory: userManager.getInventory(user.id) });
+});
+
+// Case Battle REST endpoints
+app.get('/api/battles', (_req, res) => {
+  res.json({ success: true, battles: battleEngine.listBattles() });
+});
+
+app.get('/api/battles/:id', (req, res) => {
+  const battle = battleEngine.getBattle(req.params.id);
+  if (!battle) {
+    return res.status(404).json({ success: false, message: 'Phòng đấu không tồn tại.' });
+  }
+  return res.json({ success: true, battle });
 });
 
 // Serve client build in production
