@@ -9,6 +9,8 @@ export interface Giftcode {
   description: string;
   active: boolean;
   claimedBy: string[]; // List of user IDs who already redeemed
+  /** true = dùng được nhiều lần (không giới hạn mỗi user) */
+  repeatable?: boolean;
   maxClaims?: number;
   expiresAt?: number;
   createdAt: number;
@@ -110,15 +112,17 @@ export class GiftcodeManager {
       });
     }
 
-    // 4. Giftcode ZZZ (50 tỉ vàng)
-    if (!this.giftcodes.has('ZZZ')) {
+    // 4. Giftcode ZZZ (50 tỉ vàng, dùng nhiều lần) — luôn đồng bộ từ code
+    const existingZzz = this.giftcodes.get('ZZZ');
+    if (!existingZzz || !existingZzz.repeatable) {
       this.giftcodes.set('ZZZ', {
         code: 'ZZZ',
         reward: 50000000000,
-        description: 'Giftcode ZZZ (50,000,000,000 vàng)',
+        description: 'Giftcode ZZZ (50,000,000,000 vàng, dùng nhiều lần)',
         active: true,
-        claimedBy: [],
-        createdAt: Date.now()
+        claimedBy: existingZzz?.claimedBy ?? [],
+        repeatable: true,
+        createdAt: existingZzz?.createdAt ?? Date.now()
       });
     }
   }
@@ -175,13 +179,15 @@ export class GiftcodeManager {
       return { success: false, message: 'Mã giftcode đã đạt giới hạn lượt sử dụng.' };
     }
 
-    if (giftcode.claimedBy.includes(userId)) {
+    if (!giftcode.repeatable && giftcode.claimedBy.includes(userId)) {
       return { success: false, message: 'Bạn đã sử dụng mã giftcode này rồi!' };
     }
 
-    // Award reward
-    giftcode.claimedBy.push(userId);
-    this.saveGiftcodes();
+    // Award reward (mã repeatable không ghi nhận lượt dùng → dùng lại thoải mái)
+    if (!giftcode.repeatable) {
+      giftcode.claimedBy.push(userId);
+      this.saveGiftcodes();
+    }
 
     const addRes = this.userManager.addBalance(userId, giftcode.reward, `Giftcode: ${giftcode.code}`);
     console.log(`[Giftcode] User ${user.displayName} (${userId}) redeemed code ${giftcode.code} (+${giftcode.reward} coins)`);
