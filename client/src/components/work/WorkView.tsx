@@ -212,12 +212,11 @@ export const WorkView: React.FC<WorkViewProps> = ({ user, socket, onBack, onBala
       setCurrentWord(null);
       setExpiresAt(null);
       
-      // Auto return to idle
+      // Auto return to idle — không cooldown, ra từ mới ngay
       setTimeout(() => {
         setResult(null);
         setMessage('');
-        // 3s cooldown from server
-        setCooldownUntil(Date.now() + 3000);
+        setTimeout(() => requestWorkRef.current(), 300);
       }, 1500);
     });
   }, [socket, onBalanceUpdate, user, onOpenAuth]);
@@ -232,7 +231,7 @@ export const WorkView: React.FC<WorkViewProps> = ({ user, socket, onBack, onBala
     setTimeout(() => {
       setResult(null);
       setMessage('');
-      setCooldownUntil(Date.now() + 3000);
+      setTimeout(() => requestWorkRef.current(), 300);
     }, 1500);
   }, []);
 

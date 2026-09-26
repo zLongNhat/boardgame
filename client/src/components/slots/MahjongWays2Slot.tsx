@@ -806,21 +806,56 @@ export const MahjongWays2Slot: React.FC = () => {
                 disabled={isSpinning || isFreeSpinActive}
                 onClick={() => {
                   const idx = BET_PRESETS.indexOf(betAmount);
-                  if (idx > 0) setBetAmount(BET_PRESETS[idx - 1]);
+                  if (idx > 0) {
+                    setBetAmount(BET_PRESETS[idx - 1]);
+                  } else if (betAmount > 1000000) {
+                    setBetAmount(Math.max(1000000, betAmount - 500000));
+                  } else if (betAmount > 100000) {
+                    setBetAmount(Math.max(100000, betAmount - 100000));
+                  } else if (betAmount > 10000) {
+                    setBetAmount(Math.max(10000, betAmount - 10000));
+                  } else if (betAmount > 1000) {
+                    setBetAmount(Math.max(1000, betAmount - 1000));
+                  } else if (betAmount > 100) {
+                    setBetAmount(Math.max(100, betAmount - 100));
+                  } else {
+                    setBetAmount(Math.max(10, betAmount - 10));
+                  }
                 }}
                 className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-40 font-black text-sm flex items-center justify-center border border-gray-700"
               >
                 -
               </button>
-              <div className="px-3 py-1 bg-gray-900 border border-amber-500/40 rounded-lg min-w-[90px] text-center">
-                <span className="font-black text-amber-300 text-sm sm:text-base">{betAmount.toLocaleString()}</span>
+              <div className="px-3 py-1 bg-gray-900 border border-amber-500/40 rounded-lg min-w-[90px] text-center flex items-center justify-center">
+                <input
+                  type="number"
+                  min={10}
+                  value={betAmount}
+                  disabled={isSpinning || isFreeSpinActive}
+                  onChange={(e) => setBetAmount(Math.max(10, Math.floor(Number(e.target.value) || 10)))}
+                  className="w-20 bg-transparent font-black text-amber-300 text-sm sm:text-base text-center outline-none"
+                />
                 <span className="text-[10px] text-gray-400 ml-1">🪙</span>
               </div>
               <button
                 disabled={isSpinning || isFreeSpinActive}
                 onClick={() => {
                   const idx = BET_PRESETS.indexOf(betAmount);
-                  if (idx !== -1 && idx < BET_PRESETS.length - 1) setBetAmount(BET_PRESETS[idx + 1]);
+                  if (idx !== -1 && idx < BET_PRESETS.length - 1) {
+                    setBetAmount(BET_PRESETS[idx + 1]);
+                  } else if (betAmount < 100) {
+                    setBetAmount(betAmount + 10);
+                  } else if (betAmount < 1000) {
+                    setBetAmount(betAmount + 100);
+                  } else if (betAmount < 10000) {
+                    setBetAmount(betAmount + 1000);
+                  } else if (betAmount < 100000) {
+                    setBetAmount(betAmount + 10000);
+                  } else if (betAmount < 1000000) {
+                    setBetAmount(betAmount + 100000);
+                  } else {
+                    setBetAmount(betAmount + 500000);
+                  }
                 }}
                 className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-40 font-black text-sm flex items-center justify-center border border-gray-700"
               >

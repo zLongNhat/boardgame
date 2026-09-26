@@ -222,7 +222,6 @@ export const UpgradeView: React.FC = () => {
                 <input
                   type="number"
                   min={10}
-                  max={100000}
                   value={coinBetAmount}
                   onChange={(e) => setCoinBetAmount(Math.max(10, Number(e.target.value)))}
                   className="w-full bg-gray-950/90 border border-gray-700 rounded-2xl px-4 py-3 text-lg font-black text-yellow-400 focus:outline-none focus:border-indigo-500"
@@ -245,6 +244,15 @@ export const UpgradeView: React.FC = () => {
                   </button>
                 ))}
               </div>
+
+              {/* ALL IN: cược toàn bộ số dư */}
+              <button
+                onClick={() => user && setCoinBetAmount(Math.max(10, Math.floor(user.balance)))}
+                disabled={!user || user.balance < 10}
+                className="w-full py-3 rounded-2xl font-black text-sm bg-gradient-to-r from-red-600 via-amber-500 to-red-600 hover:from-red-500 hover:to-amber-400 text-white shadow-lg shadow-red-600/30 transition-all cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                🔥 ALL IN ({(user ? Math.max(0, Math.floor(user.balance)) : 0).toLocaleString('vi-VN')} 🪙)
+              </button>
             </div>
           ) : (
             <div className="space-y-4">

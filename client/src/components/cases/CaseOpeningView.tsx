@@ -223,7 +223,7 @@ export const CaseOpeningView: React.FC = () => {
               <h3 className="font-bold text-lg text-white mb-1">{c.name}</h3>
               <p className="text-xs text-gray-400 leading-relaxed mb-4">{c.description}</p>
               <div className="flex items-center justify-between text-xs pt-3 border-t border-gray-800/80">
-                <span className="text-gray-500 font-medium">12 Skins Bên Trong</span>
+                <span className="text-gray-500 font-medium">{c.items.length} Skins Bên Trong</span>
                 <span className="text-amber-400 font-bold flex items-center gap-1">
                   Chọn hòm <ChevronRight className="w-3.5 h-3.5" />
                 </span>

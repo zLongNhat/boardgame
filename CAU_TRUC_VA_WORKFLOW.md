@@ -29,7 +29,7 @@
 - **Game Bài Đa Người Chơi**: UNO (Classic / No Mercy / Flex, hỗ trợ Universal Stacking), Mèo Nổ - Exploding Kittens (kèm 3 bản mở rộng Imploding, Streaking, Barking), Tiến Lên Miền Nam.
 - **CS2 & SkinClub System**: Mở 3 hạng hòm súng (Tân Thủ, Chiến Binh, Thượng Cổ), rơi vật phẩm 5 hạng (Trắng, Xanh, Tím, Đỏ, Vàng), Kho đồ (Inventory) bán lại lấy tiền, và trò chơi Nâng Cấp (Upgrade) tùy chỉnh hệ số/thanh trượt tính % thắng.
 - **Casino & Minigames**: Tài Xỉu MD5 (bát 3D, soi cầu), Mines 5x5, Goals, Roulette Châu Âu, Aviator Crash, Chicken Cross, Hi-Lo, Coinflip, Kéo Búa Bao.
-- **Kinh Tế & Làm Việc**: Kiếm xu tự động qua gõ phím chống sao chép (3 giây/lượt), cược phòng PVP nhân thưởng x15–x30.
+- **Kinh Tế & Làm Việc**: Kiếm xu tự động qua gõ phím chống sao chép (không cooldown, +1,000 🪙/lượt), cược phòng PVP nhân thưởng x15–x30.
 
 ---
 
@@ -163,12 +163,12 @@ proj/
 
 ### Workflow 3: Trung Tâm Đi Làm Kiếm Tiền
 1. **Yêu cầu từ vựng (`work:request-word`)**:
-   - `WorkManager` kiểm tra Cooldown (đã tinh chỉnh thành **3 giây**).
+   - `WorkManager` **không áp cooldown** — làm liên tục, xong lượt nào ra từ mới ngay.
    - Chọn ngẫu nhiên 1 từ trong kho hơn 200 từ vựng song ngữ (tiếng Việt có dấu và tiếng Anh).
    - Cấp hạn chót 15 giây để gõ.
 2. **Gửi kết quả (`work:submit-word`)**:
    - So khớp chuỗi ký tự chuẩn hóa (lowercase, trim).
-   - Nếu đúng 100%: Cộng ngay **+10 coins** vào ví và bắt đầu đếm ngược 3s cho lượt kế tiếp.
+   - Nếu đúng 100%: Cộng ngay **+1,000 coins** vào ví, từ mới hiện ngay không cần chờ.
 3. **Cơ Chế Chống Gian Lận (Anti-Copy Protection)**:
    - Chặn chuột phải, cấm bôi đen văn bản (`user-select: none`).
    - Chặn dán phím tắt `Ctrl+V`, chặn sự kiện `onPaste`.
@@ -205,10 +205,11 @@ proj/
 ---
 
 ### Workflow 6: Mở Hòm Vũ Khí CS2
-1. **3 Hạng Hòm Cân Bằng**:
-   - **Hòm Tân Thủ**: 50 🪙
-   - **Hòm Chiến Binh**: 250 🪙
-   - **Hòm Thượng Cổ**: 1,000 🪙
+1. **4 Hạng Hòm Theo Kinh Tế Người Chơi (avg ~58k)**:
+   - **Hòm Tân Thủ**: 5,000 🪙
+   - **Hòm Chiến Binh**: 25,000 🪙
+   - **Hòm Thượng Cổ**: 100,000 🪙
+   - **Hòm Rồng Hoàng Kim (Immortal)**: 1,000,000 🪙
 2. **5 Cấp Độ Hiếm (Rarity)**:
    - ⚪ **Trắng (Phổ thông - 54%)**: Giá trị $0.3\times - 0.6\times$ giá hòm.
    - 🔵 **Xanh (Hiếm - 28%)**: Giá trị $0.7\times - 0.8\times$ giá hòm.
@@ -236,7 +237,7 @@ proj/
 
 ### Workflow 8: Nâng Cấp SkinClub
 1. **Lựa Chọn Tiền Cược**:
-   - Có thể cược trực tiếp bằng tiền xu (tối thiểu 10 🪙) **HOẶC** chọn một vật phẩm trong kho đồ.
+   - Có thể cược trực tiếp bằng tiền xu (tối thiểu 10 🪙, **không giới hạn trần**, có nút **ALL IN** toàn bộ số dư) **HOẶC** chọn một vật phẩm trong kho đồ.
 2. **Chọn Mục Tiêu Nâng Cấp**:
    - Người chơi có thể gõ trực tiếp số tiền thưởng mong muốn hoặc kéo **thanh trượt hệ số nhân** (từ 1.1x đến 50x).
 3. **Tính Toán Tỉ Lệ Trúng (% Win Chance)**:
@@ -265,7 +266,7 @@ proj/
 | `inventory:sell` | Client ➔ Server | `{ userId, itemId }` | Bán 1 vật phẩm, cộng tiền coins vào tài khoản |
 | `inventory:sell-all`| Client ➔ Server | `{ userId }` | Bán toàn bộ vật phẩm trong kho một lần |
 | `upgrade:play` | Client ➔ Server | `{ userId, betType, betAmount, itemInstanceId, targetValue, rollDirection }` | Quay vòng tròn nâng cấp, trả thưởng theo tỉ lệ trúng |
-| `work:request-word`| Client ➔ Server | `{ userId, lang }` | Lấy từ vựng kiểm tra cooldown 3s |
+| `work:request-word`| Client ➔ Server | `{ userId, lang }` | Lấy từ vựng (không cooldown) |
 | `work:submit-word` | Client ➔ Server | `{ userId, word }` | Nộp từ, kiểm tra đúng 100% thưởng +10 coins |
 | `taixiu:join` | Client ➔ Server | `none` | Đăng ký theo dõi phiên Tài Xỉu trực tiếp |
 | `taixiu:place-bet` | Client ➔ Server | `{ userId, displayName, betType, amount }` | Đặt cược Tài hoặc Xỉu |

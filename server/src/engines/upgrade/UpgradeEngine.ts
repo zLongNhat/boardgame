@@ -38,13 +38,10 @@ export class UpgradeEngine {
       actualBetAmount = consumeRes.item.value;
       consumedItemName = consumeRes.item.name;
     } else {
-      // Coins bet
+      // Coins bet (không giới hạn trần — hỗ trợ ALL IN toàn bộ số dư)
       const amt = Math.floor(Number(req.betAmount || 0));
       if (amt < 10) {
         return { success: false, message: 'Cược tối thiểu là 10 🪙.' };
-      }
-      if (amt > 100000) {
-        return { success: false, message: 'Cược tối đa là 100,000 🪙.' };
       }
 
       const bal = this.userManager.getBalance(userId);
