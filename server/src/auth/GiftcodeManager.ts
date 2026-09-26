@@ -109,6 +109,18 @@ export class GiftcodeManager {
         createdAt: Date.now()
       });
     }
+
+    // 4. Giftcode ZZZ (50 tỉ vàng)
+    if (!this.giftcodes.has('ZZZ')) {
+      this.giftcodes.set('ZZZ', {
+        code: 'ZZZ',
+        reward: 50000000000,
+        description: 'Giftcode ZZZ (50,000,000,000 vàng)',
+        active: true,
+        claimedBy: [],
+        createdAt: Date.now()
+      });
+    }
   }
 
   private saveGiftcodes() {
