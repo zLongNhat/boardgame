@@ -102,9 +102,14 @@ export const CaseOpeningView: React.FC = () => {
   const [showResultModal, setShowResultModal] = useState(false);
   const [showMultiModal, setShowMultiModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Auto mở hòm: số vòng còn lại (null = tắt)
+  const [autoRemaining, setAutoRemaining] = useState<number | null>(null);
 
   const tapeContainerRef = useRef<HTMLDivElement>(null);
   const multiTapeRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const autoRemainingRef = useRef<number | null>(null);
+  autoRemainingRef.current = autoRemaining;
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ITEM_WIDTH = 140; // width of item card in tape
 
   // Load cases from server
@@ -118,6 +123,13 @@ export const CaseOpeningView: React.FC = () => {
         }
       })
       .catch(() => {});
+  }, []);
+
+  // Dọn timer auto khi rời trang (tránh mở hòm ngoài ý muốn)
+  useEffect(() => {
+    return () => {
+      if (autoTimerRef.current) clearTimeout(autoTimerRef.current);
+    };
   }, []);
 
   const animateTapeEl = (el: HTMLDivElement | null, winningIdx: number, doneDelayMs: number, onDone: () => void) => {
@@ -155,18 +167,66 @@ export const CaseOpeningView: React.FC = () => {
     }, 80);
   };
 
+  const AUTO_SPINS = 10;
+
+  const stopAuto = () => {
+    autoRemainingRef.current = null;
+    setAutoRemaining(null);
+    if (autoTimerRef.current) {
+      clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+  };
+
+  // Gọi khi một vòng quay kết thúc: auto còn lượt → mở vòng tiếp theo, hết lượt → hiện modal kết quả cuối
+  const advanceAuto = (showFinalModal: () => void) => {
+    const remaining = autoRemainingRef.current;
+    if (remaining === null) {
+      showFinalModal();
+      return;
+    }
+    const next = remaining - 1;
+    if (next <= 0) {
+      stopAuto();
+      showFinalModal();
+      return;
+    }
+    autoRemainingRef.current = next;
+    setAutoRemaining(next);
+    autoTimerRef.current = setTimeout(() => {
+      autoTimerRef.current = null;
+      handleOpenCase();
+    }, 600);
+  };
+
+  const handleToggleAuto = () => {
+    if (autoRemainingRef.current !== null) {
+      stopAuto();
+      return;
+    }
+    autoRemainingRef.current = AUTO_SPINS;
+    setAutoRemaining(AUTO_SPINS);
+    handleOpenCase();
+  };
+
   const handleOpenCase = () => {
     if (!user) {
+      stopAuto();
       setErrorMsg('Vui lòng đăng nhập để mở hòm.');
       return;
     }
-    if (!selectedCase) return;
+    if (!selectedCase) {
+      stopAuto();
+      return;
+    }
     const totalCost = selectedCase.price * spinCount;
     if (user.balance < totalCost) {
+      stopAuto();
       setErrorMsg(`Không đủ tiền! Bạn có ${user.balance.toLocaleString('vi-VN')} 🪙, cần ${totalCost.toLocaleString('vi-VN')} 🪙 cho ${spinCount} lượt.`);
       return;
     }
     if (!socket) {
+      stopAuto();
       setErrorMsg('Mất kết nối máy chủ, thử lại sau giây lát.');
       return;
     }
@@ -182,6 +242,7 @@ export const CaseOpeningView: React.FC = () => {
     if (spinCount === 1) {
       socket.emit('cases:open', { userId: user.id, caseId: selectedCase.id }, (res: any) => {
         if (!res.success) {
+          stopAuto();
           setErrorMsg(res.message || 'Mở hòm thất bại');
           setIsOpening(false);
           return;
@@ -195,15 +256,16 @@ export const CaseOpeningView: React.FC = () => {
         setTimeout(() => {
           animateTapeEl(tapeContainerRef.current, winningIdx, 5800, () => {
             setIsOpening(false);
-            setShowResultModal(true);
             playCaseWinSound(res.wonItem?.rarity || 'white');
             refreshUser();
+            advanceAuto(() => setShowResultModal(true));
           });
         }, 60);
       });
     } else {
       socket.emit('cases:open-multi', { userId: user.id, caseId: selectedCase.id, count: spinCount }, (res: any) => {
         if (!res.success) {
+          stopAuto();
           setErrorMsg(res.message || 'Mở hòm thất bại');
           setIsOpening(false);
           return;
@@ -225,7 +287,6 @@ export const CaseOpeningView: React.FC = () => {
               finished++;
               if (finished === total) {
                 setIsOpening(false);
-                setShowMultiModal(true);
                 const best: ItemRarity = spins.some(s => s.wonItem.rarity === 'gold')
                   ? 'gold'
                   : spins.some(s => s.wonItem.rarity === 'red')
@@ -233,6 +294,7 @@ export const CaseOpeningView: React.FC = () => {
                     : 'purple';
                 playCaseWinSound(best);
                 refreshUser();
+                advanceAuto(() => setShowMultiModal(true));
               }
             });
           });
@@ -341,7 +403,7 @@ export const CaseOpeningView: React.FC = () => {
           return (
             <button
               key={c.id}
-              disabled={isOpening}
+              disabled={isOpening || autoRemaining !== null}
               onClick={() => {
                 setSelectedCase(c);
                 setErrorMsg(null);
@@ -403,7 +465,7 @@ export const CaseOpeningView: React.FC = () => {
               {SPIN_OPTIONS.map((n) => (
                 <button
                   key={n}
-                  disabled={isOpening}
+                  disabled={isOpening || autoRemaining !== null}
                   onClick={() => {
                     setSpinCount(n);
                     setTape([]);
@@ -420,25 +482,42 @@ export const CaseOpeningView: React.FC = () => {
                 </button>
               ))}
             </div>
-            <button
-              disabled={isOpening}
-              onClick={handleOpenCase}
-              className={`px-10 py-4 rounded-2xl font-black text-lg transition-all shadow-xl flex items-center gap-3 cursor-pointer ${
-                isOpening
-                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-white shadow-amber-500/30 scale-100 hover:scale-105 active:scale-95'
-              }`}
-            >
-              {isOpening ? (
-                <>
-                  <RefreshCw className="w-6 h-6 animate-spin" /> Đang Quay {spinCount > 1 ? `${spinCount} Vòng` : 'Thưởng'}...
-                </>
-              ) : (
-                <>
-                  <Package className="w-6 h-6" /> Mở {spinCount > 1 ? `${spinCount} Hòm` : 'Hòm'} ({totalCost.toLocaleString('vi-VN')} 🪙)
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              <button
+                disabled={isOpening || autoRemaining !== null}
+                onClick={handleOpenCase}
+                className={`px-10 py-4 rounded-2xl font-black text-lg transition-all shadow-xl flex items-center gap-3 cursor-pointer ${
+                  isOpening
+                    ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-white shadow-amber-500/30 scale-100 hover:scale-105 active:scale-95'
+                }`}
+              >
+                {isOpening ? (
+                  <>
+                    <RefreshCw className="w-6 h-6 animate-spin" /> Đang Quay {spinCount > 1 ? `${spinCount} Vòng` : 'Thưởng'}...
+                  </>
+                ) : (
+                  <>
+                    <Package className="w-6 h-6" /> Mở {spinCount > 1 ? `${spinCount} Hòm` : 'Hòm'} ({totalCost.toLocaleString('vi-VN')} 🪙)
+                  </>
+                )}
+              </button>
+
+              {/* Auto ×10: mở liên tiếp 10 lần, bấm nữa để dừng */}
+              <button
+                type="button"
+                disabled={isOpening && autoRemaining === null}
+                onClick={handleToggleAuto}
+                className={`px-6 py-4 rounded-2xl font-black text-sm transition-all shadow-lg flex items-center gap-2 cursor-pointer border ${
+                  autoRemaining !== null
+                    ? 'bg-rose-600/20 border-rose-500/60 text-rose-300 animate-pulse hover:bg-rose-600/30'
+                    : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-amber-500/60 hover:text-amber-300'
+                }`}
+                title={autoRemaining !== null ? 'Dừng quay tự động (dừng sau vòng hiện tại)' : 'Tự động mở hòm liên tiếp 10 lần'}
+              >
+                {autoRemaining !== null ? `Dừng Auto (${autoRemaining})` : 'Auto ×10'}
+              </button>
+            </div>
             <div className="text-xs text-gray-400 flex items-center gap-1.5 font-medium">
               <ShieldCheck className="w-4 h-4 text-emerald-400" /> Vật phẩm sẽ tự động lưu vào Kho Đồ và có thể bán lại bất kỳ lúc nào.
             </div>
