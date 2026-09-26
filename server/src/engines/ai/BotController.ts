@@ -2,9 +2,11 @@ import crypto from 'crypto';
 import { BaseGame } from '../BaseGame';
 import { ExplodingKittensGame } from '../exploding-kittens/ExplodingKittensGame';
 import { TienLenGame } from '../tien-len/TienLenGame';
+import { SamGame } from '../sam/SamGame';
 import { UnoGame } from '../uno/UnoGame';
 import { ExplodingKittensBotStrategy } from './strategies/ExplodingKittensBotStrategy';
 import { TienLenBotStrategy } from './strategies/TienLenBotStrategy';
+import { SamBotStrategy } from './strategies/SamBotStrategy';
 import { UnoBotStrategy } from './strategies/UnoBotStrategy';
 
 export class BotController {
@@ -84,7 +86,19 @@ export class BotController {
       }
     }
 
-    // 3. Regular active turn
+    // 3. Sâm Lốc Báo Sâm check
+    if (this.game instanceof SamGame) {
+      if (this.game.state.phase === 'bao_sam') {
+        for (const botId of this.botIds) {
+          const p = this.game.state.players.find(player => player.id === botId);
+          if (p && !(p as any).hasBaoSamResponded) {
+            return { botId, actionType: 'reaction' };
+          }
+        }
+      }
+    }
+
+    // 4. Regular active turn
     const currentPlayer = this.game.getCurrentPlayer();
     if (currentPlayer && this.botIds.has(currentPlayer.id) && !currentPlayer.eliminated) {
       return { botId: currentPlayer.id, actionType: 'turn' };
@@ -101,6 +115,8 @@ export class BotController {
         ExplodingKittensBotStrategy.decideAction(botId, this.game);
       } else if (this.game instanceof TienLenGame) {
         TienLenBotStrategy.decideAction(botId, this.game);
+      } else if (this.game instanceof SamGame) {
+        SamBotStrategy.decideAction(botId, this.game);
       }
     } catch (err) {
       console.error(`[BotController] Error executing bot ${botId}:`, err);

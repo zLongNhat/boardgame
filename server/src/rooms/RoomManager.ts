@@ -3,6 +3,7 @@ import { BaseGame, GameType } from '../engines/BaseGame';
 import { BotController } from '../engines/ai/BotController';
 import { ExplodingKittensGame } from '../engines/exploding-kittens/ExplodingKittensGame';
 import { TienLenGame } from '../engines/tien-len/TienLenGame';
+import { SamGame } from '../engines/sam/SamGame';
 import { UnoMode, UnoRules } from '../engines/uno/types';
 import { UnoGame } from '../engines/uno/UnoGame';
 
@@ -365,7 +366,8 @@ export class RoomManager {
     const minMax: Record<GameType, { min: number; max: number }> = {
       'uno': { min: 2, max: 8 },
       'exploding-kittens': { min: 2, max: 5 },
-      'tien-len': { min: 2, max: 4 }
+      'tien-len': { min: 2, max: 4 },
+      'sam': { min: 2, max: 5 }
     };
 
     const limits = minMax[room.settings.gameType];
@@ -409,6 +411,12 @@ export class RoomManager {
           turnTimeLimit: room.settings.turnTimeLimit,
           firstTurnRule: room.settings.tienLenFirstTurnRule,
           cutTwoOutOfTurnRule: room.settings.tienLenCutTwoRule
+        });
+        break;
+
+      case 'sam':
+        game = new SamGame(enginePlayers, {
+          turnTimeLimit: room.settings.turnTimeLimit
         });
         break;
     }
@@ -515,6 +523,7 @@ export class RoomManager {
   public getMaxCapacity(room: Room): number {
     if (room.settings.gameType === 'uno') return 8;
     if (room.settings.gameType === 'tien-len') return 4;
+    if (room.settings.gameType === 'sam') return 5;
     if (room.settings.gameType === 'exploding-kittens') {
       let max = 5;
       const exp = room.settings.ekExpansions;

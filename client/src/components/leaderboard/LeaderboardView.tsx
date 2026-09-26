@@ -4,7 +4,7 @@ import { PublicUser } from '../../types/game';
 import { useAuth } from '../../context/AuthContext';
 import { useLang } from '../../i18n/LanguageContext';
 
-type LeaderboardTab = 'all' | 'uno' | 'exploding-kittens' | 'tien-len';
+type LeaderboardTab = 'all' | 'uno' | 'exploding-kittens' | 'tien-len' | 'sam';
 
 interface LeaderboardViewProps {
   onClose?: () => void;
@@ -84,6 +84,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => 
         return u.stats.explodingKittensWins;
       case 'tien-len':
         return u.stats.tienLenWins;
+      case 'sam':
+        return (u.stats as any).samWins || 0;
       default:
         return u.stats.totalWins;
     }
@@ -97,6 +99,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => 
         return t('lb.ekWinsCol');
       case 'tien-len':
         return t('lb.tlWinsCol');
+      case 'sam':
+        return t('lb.samWinsCol');
       default:
         return t('lb.totalWinsCol');
     }
@@ -147,12 +151,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({ onClose }) => 
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6 bg-slate-950/70 p-1.5 rounded-2xl border border-slate-800/80">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6 bg-slate-950/70 p-1.5 rounded-2xl border border-slate-800/80">
         {[
           { id: 'all', label: t('lb.tabAll') },
           { id: 'uno', label: t('lb.tabUno') },
           { id: 'exploding-kittens', label: t('lb.tabEk') },
-          { id: 'tien-len', label: t('lb.tabTl') }
+          { id: 'tien-len', label: t('lb.tabTl') },
+          { id: 'sam', label: t('lb.tabSam') }
         ].map((tab) => (
           <button
             key={tab.id}

@@ -72,16 +72,59 @@ const FEATURED_GAMES: (SlotGameInfo & { status: 'live' | 'upcoming'; badge: stri
   {
     id: 'treasures-of-aztec',
     name: 'Treasures of Aztec',
-    tagline: 'Kho Báu Maya Aztec - Kim Tự Tháp Nổ Bão Multiplier',
+    tagline: 'Kho Báu Maya Aztec - 32,400 Ways, Wilds-on-the-Way & Multiplier Bùng Nổ',
     provider: 'PG Soft',
     banner: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
     reels: [5, 6, 6, 6, 6, 5],
     rtp: '96.71%',
     maxWin: '100,000x',
     volatility: 'Cao',
-    status: 'upcoming',
-    badge: 'SẮP RA MẮT ⏳',
-    features: ['32,400 Ways to Win', 'Tăng Hệ Số Không Giới Hạn']
+    status: 'live',
+    badge: 'SIÊU PHẨM 🗿',
+    features: [
+      '32,400 Cách Chiến Thắng',
+      'Wilds-on-the-Way (Khung Bạc ➔ Vàng ➔ WILD)',
+      'Hệ Số Tăng Không Giới Hạn (+1 Base, +2 Free Spins)',
+      'Mua Vòng Quay Miễn Phí (75x)'
+    ]
+  },
+  {
+    id: 'caishen-wins',
+    name: 'Caishen Wins',
+    tagline: 'Thần Tài Giàu Sang - 32,400 Ways, Wilds-on-the-Way & Free Spins x8!',
+    provider: 'PG Soft',
+    banner: `${import.meta.env.BASE_URL}assets/caishen/cover.png`,
+    reels: [5, 6, 6, 6, 6, 5],
+    rtp: '96.92%',
+    maxWin: '100,000x',
+    volatility: 'Cao',
+    status: 'live',
+    badge: 'THẦN TÀI ĐẾN 🧧',
+    features: [
+      '2,025 - 32,400 Ways (Top Reel + Stacked)',
+      'Wilds-on-the-Way (Khung Bạc ➔ Vàng ➔ WILD)',
+      'Free Spins 8 Lượt x8 + Gamble 20/x20',
+      'Mức Cược Lên Đến 1,000,000 🪙 (Vô Hạn)'
+    ]
+  },
+  {
+    id: 'cocktail-nights',
+    name: 'Cocktail Nights',
+    tagline: 'Pha Chế Neon - 15,625 Ways, Wilds Nền Vàng & Multiplier Reel!',
+    provider: 'PG Soft',
+    banner: `${import.meta.env.BASE_URL}assets/cocktail/cover.png`,
+    reels: [5, 5, 5, 5, 5, 5],
+    rtp: '96.75%',
+    maxWin: '100,000x',
+    volatility: 'Trung bình',
+    status: 'live',
+    badge: 'NEON MỚI 🍸',
+    features: [
+      '400 - 15,625 Ways (Stacked 2-4 Ô)',
+      'Wilds Nền Vàng ➔ WILD',
+      'Multiplier Reel Dưới Cuộn 2-5',
+      'Free Spins 10 Lượt, Mult Không Reset'
+    ]
   }
 ];
 

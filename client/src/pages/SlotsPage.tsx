@@ -5,6 +5,9 @@ import { SlotsHubView } from '../components/slots/SlotsHubView';
 import { WildBountySlot } from '../components/slots/WildBountySlot';
 import { MahjongWays2Slot } from '../components/slots/MahjongWays2Slot';
 import { MahjongWaysSlot } from '../components/slots/MahjongWaysSlot';
+import { TreasuresOfAztecSlot } from '../components/slots/TreasuresOfAztecSlot';
+import { CaishenWinsSlot } from '../components/slots/CaishenWinsSlot';
+import { CocktailNightsSlot } from '../components/slots/CocktailNightsSlot';
 
 export const SlotsPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -43,6 +46,12 @@ export const SlotsPage: React.FC = () => {
             <MahjongWays2Slot />
           ) : id === 'mahjong-ways' ? (
             <MahjongWaysSlot />
+          ) : id === 'treasures-of-aztec' ? (
+            <TreasuresOfAztecSlot />
+          ) : id === 'caishen-wins' ? (
+            <CaishenWinsSlot />
+          ) : id === 'cocktail-nights' ? (
+            <CocktailNightsSlot />
           ) : (
             <div className="text-center py-16 text-gray-400">
               <p>Trò chơi đang phát triển và sẽ sớm ra mắt!</p>

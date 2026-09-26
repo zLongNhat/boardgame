@@ -12,32 +12,11 @@ interface ReelColumnViewProps {
   animationPhase: TileAnimationPhase;
   cascadeDropCount?: number; // Number of tiles dropped from top during cascade
   fallDistances?: number[]; // Khoảng rơi từng ô (số bước ô), 0 = đứng yên
-  dummySymbols?: SlotSymbolId[];
-  goldCols?: number[];
+  dummySymbols?: SlotSymbolId[]; // Giữ để tương thích API cũ — không còn dùng (dải quay dựng từ block thật)
+  goldCols?: number[]; // Giữ để tương thích API cũ — không còn dùng
   renderTile?: (tile: SlotTile, phase: TileAnimationPhase) => React.ReactNode;
   onReelStop?: (colIdx: number) => void;
 }
-
-const DUMMY_SYMBOLS: SlotSymbolId[] = [
-  'cowgirl',
-  'whiskey',
-  'hat',
-  'holster',
-  'A',
-  'K',
-  'Q',
-  'J',
-  'whiskey',
-  'scatter',
-  'hat',
-  'cowgirl',
-  'A',
-  'holster',
-  'K',
-  'Q',
-  'scatter',
-  'J'
-];
 
 export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
   colIdx,
@@ -49,12 +28,13 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
   animationPhase,
   cascadeDropCount = 0,
   fallDistances,
-  dummySymbols,
-  goldCols,
   renderTile,
   onReelStop
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  // Khóa chiều cao container lúc nghỉ để khi quay (dải dài) khung không giãn ra.
+  const [lockedH, setLockedH] = useState<number | null>(null);
   const prevTilesRef = useRef<SlotTile[]>(visibleTiles);
   const [tapeTiles, setTapeTiles] = useState<SlotTile[]>(visibleTiles);
   const [offsetY, setOffsetY] = useState(0);
@@ -64,7 +44,63 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
   const [tileOffsets, setTileOffsets] = useState<number[]>(() => new Array(height).fill(0));
   const [cascadeFalling, setCascadeFalling] = useState(false);
 
+  const hasFall =
+    !isSpinning &&
+    !!fallDistances &&
+    fallDistances.length === height &&
+    fallDistances.some(f => f > 0);
+
+  // Đo pitch chính xác = chiều cao 1 ô + gap. KHÔNG dùng clientHeight/height
+  // vì container có padding nên step bị lệch (padding/height mỗi ô), tích lũy
+  // thành snap vài px đến vài chục px khi dừng — nguyên nhân giật cục.
+  const measureStep = () => {
+    const stripEl = stripRef.current;
+    const first = stripEl?.firstElementChild as HTMLElement | null;
+    const tileH = first?.getBoundingClientRect().height || 0;
+    let gap = 0;
+    if (stripEl && typeof getComputedStyle === 'function') {
+      const parsed = parseFloat(getComputedStyle(stripEl).rowGap);
+      if (!Number.isNaN(parsed)) gap = parsed;
+    }
+    const pitch = tileH > 0 ? tileH + gap : 0;
+    return pitch > 0 ? pitch : 82;
+  };
+
+  // Đồng bộ offset xuất phát NGAY TRONG RENDER (derived state) để frame đầu tiên
+  // của cascade đã ở đúng vị trí xuất phát — không còn flash 1 frame ở vị trí cuối
+  // rồi mới bật ngược lên (nguyên nhân của hiện tượng giật/snap khi kết thúc cascade).
+  const [appliedFalls, setAppliedFalls] = useState<number[] | undefined>(undefined);
+  if (fallDistances !== appliedFalls) {
+    setAppliedFalls(fallDistances);
+    if (hasFall) {
+      const step = measureStep();
+      setTileOffsets((fallDistances as number[]).map(f => -f * step));
+      if (cascadeFalling) setCascadeFalling(false);
+    } else if (!isSpinning) {
+      setTileOffsets(new Array(height).fill(0));
+      if (cascadeFalling) setCascadeFalling(false);
+    }
+  }
+
+  // Khi nghỉ (không quay/rơi), đo và khóa chiều cao container theo đúng
+  // content hiện tại. Lúc quay dải rất dài nhưng khung giữ nguyên → không
+  // còn hiện tượng toàn bộ giàn cuộn giãn dài ra gây khó chịu.
+  const isIdle = !isSpinning && !isRolling && !hasFall;
+  useEffect(() => {
+    if (!isIdle) return;
+    const measure = () => {
+      const h = stripRef.current?.offsetHeight || 0;
+      if (h > 0) setLockedH(prev => (prev === h ? prev : h));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [isIdle, visibleTiles, height]);
+
   // 1. Initial spin roll logic (when isSpinning === true)
+  // Dải quay được dựng HOÀN TOÀN từ block thật (targetTiles lặp lại) — không còn
+  // ô dummy ngẫu nhiên nên những gì bay qua chính là symbol thật, dừng chuẩn
+  // xác ở kết quả, không giật/snap hình.
   useEffect(() => {
     if (!isSpinning) {
       const isCascading =
@@ -86,40 +122,42 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
       : visibleTiles;
     const targetTiles = visibleTiles;
 
-    const dummyCount = 12;
-    const dummyTiles: SlotTile[] = [];
-    const pool = dummySymbols && dummySymbols.length > 0 ? dummySymbols : DUMMY_SYMBOLS;
-    const goldAllowed = goldCols ? goldCols.includes(colIdx) : colIdx > 0 && colIdx < 5;
-    for (let i = 0; i < dummyCount; i++) {
-      const randSym = pool[Math.floor(Math.random() * pool.length)];
-      dummyTiles.push({
-        id: `dummy_${colIdx}_${i}_${Math.random()}`,
-        symbol: randSym,
-        isGold: randSym !== 'scatter' && randSym !== 'wild' && goldAllowed && Math.random() < 0.1
-      });
+    // Lặp lại đúng các block kết quả để tạo chiều dài dải quay.
+    // Mini cột top reel (height=1) chỉ cần dải ngắn để đỡ nhấp nháy.
+    const repeatCount = Math.max(2, Math.ceil(8 / height));
+    const filler: SlotTile[] = [];
+    for (let r = 0; r < repeatCount; r++) {
+      for (let i = 0; i < targetTiles.length; i++) {
+        const t = targetTiles[i];
+        filler.push({
+          ...t,
+          id: `spin_${colIdx}_${r}_${i}`,
+          isWinning: false,
+          transformedToWild: false
+        });
+      }
     }
 
     const strip: SlotTile[] = [
       ...targetTiles,
-      ...dummyTiles,
+      ...filler,
       ...prevTiles.map((t, idx) => ({ ...t, id: `prev_${colIdx}_${idx}_${t.id}` }))
     ];
 
     setTapeTiles(strip);
 
-    const clientH = containerRef.current?.clientHeight || 0;
-    const step = clientH > 0 ? clientH / height : 82;
-    const startOffset = -((height + dummyCount) * step);
+    const step = measureStep();
+    const startOffset = -((height + filler.length) * step);
 
     setOffsetY(startOffset);
     setIsRolling(false);
 
+    let rafId2 = 0;
     const rafId1 = requestAnimationFrame(() => {
-      const rafId2 = requestAnimationFrame(() => {
+      rafId2 = requestAnimationFrame(() => {
         setIsRolling(true);
         setOffsetY(0);
       });
-      return () => cancelAnimationFrame(rafId2);
     });
 
     const stopTimer = setTimeout(() => {
@@ -134,6 +172,7 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
 
     return () => {
       cancelAnimationFrame(rafId1);
+      if (rafId2) cancelAnimationFrame(rafId2);
       clearTimeout(stopTimer);
     };
   }, [isSpinning, spinDuration, visibleTiles, colIdx, height, onReelStop, cascadeDropCount]);
@@ -141,26 +180,10 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
   // 2. Cascade Drop logic: chỉ ô phía trên điểm vỡ rơi thẳng xuống.
   // Ô dưới điểm vỡ (fall = 0) đứng yên 100%, không áp animation/transition.
   // Tổng thể chỉ rơi xuống (translateY âm -> 0), không nảy lên (no overshoot/bounce).
+  // Khi cascade luôn render lưới MỚI (visibleTiles), không bao giờ render tapeTiles
+  // chứa ô cũ nên không còn lệch ô/giật đổi hình.
   useEffect(() => {
-    const hasFall =
-      !isSpinning &&
-      fallDistances &&
-      fallDistances.length === height &&
-      fallDistances.some(f => f > 0);
-    if (!hasFall) {
-      if (!isSpinning) {
-        setCascadeFalling(false);
-        setTileOffsets(new Array(height).fill(0));
-      }
-      return;
-    }
-
-    const clientH = containerRef.current?.clientHeight || height * 82;
-    const step = clientH > 0 ? clientH / height : 82;
-    const startOffsets = (fallDistances as number[]).map(f => -f * step);
-
-    setCascadeFalling(false);
-    setTileOffsets(startOffsets);
+    if (!hasFall) return;
 
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
@@ -181,18 +204,24 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
       if (raf2) cancelAnimationFrame(raf2);
       clearTimeout(landTimer);
     };
-  }, [fallDistances, isSpinning, visibleTiles, height]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fallDistances, isSpinning, height]);
+
+  // Khi cascade: render lưới mới với offset đã đồng bộ sẵn.
+  // Khi quay: render dải tape (block thật). Không bao giờ lẫn ô cũ vào cascade.
+  const tiles = (isSpinning || isRolling) && !hasFall ? tapeTiles : visibleTiles;
 
   return (
     <div
       ref={containerRef}
       data-col={colIdx}
-      className={`relative flex flex-col justify-center rounded-xl p-1 border shadow-inner overflow-hidden transition-all duration-300 ${
+      className={`relative flex flex-col justify-start rounded-xl p-1 border shadow-inner overflow-hidden transition-all duration-300 ${
         isAnticipating
           ? 'animate-anticipation bg-rose-950/40 border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.8)]'
           : 'bg-black/40 border-amber-900/30'
       }`}
       style={{
+        height: lockedH ?? undefined,
         maxHeight: `${height * 88 + 8}px`
       }}
     >
@@ -211,16 +240,18 @@ export const ReelColumnView: React.FC<ReelColumnViewProps> = ({
 
       {/* Reel Strip Container (chỉ dùng cho spin đầu, cascade dùng animation từng ô) */}
       <div
+        ref={stripRef}
         style={{
           transform: `translateY(${offsetY}px)`,
           transition: isRolling
             ? `transform ${spinDuration}ms cubic-bezier(0.12, 0.85, 0.28, 1)`
-            : 'none'
+            : 'none',
+          willChange: isRolling ? 'transform' : undefined
         }}
-        className="flex flex-col gap-1.5 sm:gap-2 justify-center"
+        className="flex flex-col gap-1.5 sm:gap-2 justify-start"
       >
-        {(isSpinning || isRolling ? tapeTiles : visibleTiles).map((tile, rowIdx) => {
-          const fall = !isSpinning && !isRolling && fallDistances ? fallDistances[rowIdx] || 0 : 0;
+        {tiles.map((tile, rowIdx) => {
+          const fall = hasFall && fallDistances ? fallDistances[rowIdx] || 0 : 0;
           const isFallingTile = fall > 0 && (cascadeFalling || (tileOffsets[rowIdx] || 0) !== 0);
           const phase = isSpinning || isRolling ? 'idle' : animationPhase;
           return (

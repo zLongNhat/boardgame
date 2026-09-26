@@ -16,8 +16,10 @@
 const KEY_USERS = 'omnideck:users';
 const KEY_SESSIONS = 'omnideck:sessions';
 const KEY_TAIXIU_JACKPOT = 'omnideck:taixiu-jackpot';
+const KEY_GIFTCODES = 'omnideck:giftcodes';
+const KEY_TRANSACTIONS = 'omnideck:transactions';
 
-export const PERSISTED_KEYS = { KEY_USERS, KEY_SESSIONS, KEY_TAIXIU_JACKPOT };
+export const PERSISTED_KEYS = { KEY_USERS, KEY_SESSIONS, KEY_TAIXIU_JACKPOT, KEY_GIFTCODES, KEY_TRANSACTIONS };
 
 const SAVE_DEBOUNCE_MS = 10_000;
 const FETCH_TIMEOUT_MS = 8_000;

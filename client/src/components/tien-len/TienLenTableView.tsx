@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUpDown, Play, Sparkles } from 'lucide-react';
-import { MaskedTLGameState, Suit, TLCard } from '../../types/game';
+import { MaskedSamGameState, MaskedTLGameState, Suit, TLCard } from '../../types/game';
 import { sounds } from '../../utils/sound';
 import { calcFanTransform, isDroppedInZone } from '../../utils/cardFan';
 import { syncHandOrder, reorderHand, calcReorderIndex, sortTLCards } from '../../utils/handReorder';
 import { getSuggestedCombos, findMatchingComboForCard } from '../../utils/tienLenSuggestions';
 
 interface TienLenTableViewProps {
-  gameState: MaskedTLGameState;
+  gameState: MaskedTLGameState | MaskedSamGameState;
   myPlayerId: string;
   onSendAction: (action: any) => void;
 }
@@ -22,7 +22,7 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
   const [sortBy, setSortBy] = useState<'rank' | 'suit' | 'custom'>('rank');
   const [isDraggingCard, setIsDraggingCard] = useState<boolean>(false);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
-  const [autoSelectCombo, setAutoSelectCombo] = useState<boolean>(true);
+  const [autoSelectCombo, setAutoSelectCombo] = useState<boolean>(false); // Mặc định là Chọn Lẻ để tự do toggle lá bài
   const [slidingCards, setSlidingCards] = useState<TLCard[] | null>(null);
   const [displayedTrick, setDisplayedTrick] = useState<any>(gameState.currentTrick);
   const [orderedHand, setOrderedHand] = useState<TLCard[]>(() => sortTLCards(gameState.myHand, 'rank'));
@@ -66,8 +66,16 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
   const myPlayer = gameState.players.find(p => p.id === myPlayerId);
   const hasPassed = myPlayer?.hasPassedCurrentRound ?? false;
 
+  const isSam = gameState.gameType === 'sam';
+  const samState = isSam ? (gameState as MaskedSamGameState) : null;
+  const isBaoSamPhase = Boolean(isSam && samState?.phase === 'bao_sam');
+  const samCaller = isSam && samState?.samCallerId
+    ? gameState.players.find(p => p.id === samState.samCallerId)
+    : null;
+
   // Check if current selection can perform a valid cut (even out of turn)
   const canCutOutOfTurn = useMemo(() => {
+    if (isSam) return false;
     if (!gameState.currentTrick || selectedCardIds.length === 0) return false;
     const selected = gameState.myHand.filter(c => selectedCardIds.includes(c.id));
     const sorted = [...selected].sort((a, b) => a.overallRank - b.overallRank);
@@ -83,7 +91,7 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
       if (curr.type === 'four_pair_sequence') return sorted[7].overallRank > curr.highestCard.overallRank;
     }
 
-    const allowCutTwo = gameState.cutTwoOutOfTurnRule !== false;
+    const allowCutTwo = (gameState as MaskedTLGameState).cutTwoOutOfTurnRule !== false;
     if (!allowCutTwo) return false;
 
     // Tứ quý
@@ -101,7 +109,7 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
     }
 
     return false;
-  }, [gameState.currentTrick, selectedCardIds, gameState.myHand, gameState.cutTwoOutOfTurnRule]);
+  }, [isSam, gameState.currentTrick, selectedCardIds, gameState.myHand, (gameState as any).cutTwoOutOfTurnRule]);
 
   // Selected cards combination detector for live UI badge
   const comboPreview = useMemo(() => {
@@ -111,6 +119,39 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
     const sorted = [...selected].sort((a, b) => a.overallRank - b.overallRank);
     const len = sorted.length;
     const curr = gameState.currentTrick?.combo;
+
+    // Sâm Lốc rules
+    if (isSam) {
+      if (len === 1) return `Bài lẻ [${sorted[0].value}]`;
+      if (len === 2 && sorted[0].rankValue === sorted[1].rankValue) return `Đôi [${sorted[0].value}]`;
+      if (len === 3 && sorted[0].rankValue === sorted[1].rankValue && sorted[1].rankValue === sorted[2].rankValue) {
+        return `Sám cô [${sorted[0].value}]`;
+      }
+      if (len === 4 && sorted[0].rankValue === sorted[1].rankValue && sorted[1].rankValue === sorted[2].rankValue && sorted[2].rankValue === sorted[3].rankValue) {
+        if (curr && curr.type === 'single' && curr.cards[0].rankValue === 15) return `💥 TỨ QUÝ CHẶT HEO!`;
+        return `🔥 TỨ QUÝ [${sorted[0].value}]`;
+      }
+      if (len === 3 && sorted.some(c => c.rankValue === 14) && sorted.some(c => c.rankValue === 15) && sorted.some(c => c.rankValue === 3)) {
+        return `Sảnh hạ [A-2-3]`;
+      }
+      if (len >= 3) {
+        let isStraight = true;
+        for (let i = 0; i < len - 1; i++) {
+          if (sorted[i].rankValue === 15 || sorted[i + 1].rankValue === 15) {
+            isStraight = false;
+            break;
+          }
+          if (sorted[i + 1].rankValue !== sorted[i].rankValue + 1) {
+            isStraight = false;
+            break;
+          }
+        }
+        if (isStraight) {
+          return `Sảnh ${len} lá (${sorted[0].value} ➔ ${sorted[len - 1].value})`;
+        }
+      }
+      return 'Tổ hợp chưa hợp lệ';
+    }
 
     if (len === 1) return `Rác [${sorted[0].value}${getSuitIcon(sorted[0].suit)}]`;
     if (len === 2 && sorted[0].rankValue === sorted[1].rankValue) return `Đôi [${sorted[0].value}]`;
@@ -164,15 +205,16 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
     }
 
     return 'Tổ hợp chưa hợp lệ';
-  }, [selectedCardIds, gameState.myHand, gameState.currentTrick]);
+  }, [isSam, selectedCardIds, gameState.myHand, gameState.currentTrick]);
 
   const isFirstTurnWithThreeSpades = useMemo(() => {
+    if (isSam) return false;
     return Boolean(
-      gameState.firstTurnRule &&
+      (gameState as MaskedTLGameState).firstTurnRule &&
       gameState.trickHistory.length === 0 &&
       gameState.currentTrick === null
     );
-  }, [gameState.firstTurnRule, gameState.trickHistory.length, gameState.currentTrick]);
+  }, [isSam, (gameState as any).firstTurnRule, gameState.trickHistory.length, gameState.currentTrick]);
 
   // Suggested playable combinations from player hand
   const suggestedCombos = useMemo(() => {
@@ -189,8 +231,9 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
     return getSuggestedCombos(gameState.myHand, gameState.currentTrick, isFirstTurnWithThreeSpades);
   }, [gameState.myHand, gameState.currentTrick, isMyTurn, hasPassed, isFirstTurnWithThreeSpades]);
 
-  // Hovered combo detector: when mouse hovers over any card, find matching playable combo
+  // Hovered combo detector: ONLY active when autoSelectCombo is TRUE. When in 'chọn lẻ', return null so user can freely toggle!
   const hoveredCombo = useMemo(() => {
+    if (!autoSelectCombo) return null;
     if (!hoveredCardId) return null;
     return findMatchingComboForCard(
       hoveredCardId,
@@ -198,7 +241,7 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
       gameState.currentTrick,
       isFirstTurnWithThreeSpades
     );
-  }, [hoveredCardId, gameState.myHand, gameState.currentTrick, isFirstTurnWithThreeSpades]);
+  }, [autoSelectCombo, hoveredCardId, gameState.myHand, gameState.currentTrick, isFirstTurnWithThreeSpades]);
 
   const hoveredComboIds = useMemo(() => {
     if (!hoveredCombo) return hoveredCardId ? [hoveredCardId] : [];
@@ -276,6 +319,47 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
 
   return (
     <div className="absolute inset-0 select-none pointer-events-none">
+      {/* Sâm Lốc: Báo Sâm Phase Modal */}
+      {isBaoSamPhase && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-auto bg-slate-900/95 border-2 border-amber-400 p-5 rounded-3xl shadow-2xl flex flex-col items-center max-w-md text-center backdrop-blur-md animate-in fade-in zoom-in duration-300">
+          <span className="text-3xl mb-1">🔔</span>
+          <h4 className="text-base font-black text-amber-300 uppercase tracking-wide">
+            Giai Đoạn Xin Sâm (Báo Sâm)
+          </h4>
+          <p className="text-xs text-slate-300 mt-1 mb-4 leading-relaxed">
+            Bạn có bài đẹp và tự tin đánh hết mà không ai chặn được? Nếu bị chặn dù chỉ 1 quân, bạn sẽ bị phạt <strong className="text-rose-400">Đền Sâm</strong>!
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                sounds.playUnoShout();
+                onSendAction({ type: 'BAO_SAM', baoSam: true });
+              }}
+              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-lg active:scale-95 transition-transform cursor-pointer"
+            >
+              👑 Xin Sâm (Báo Sâm)
+            </button>
+            <button
+              onClick={() => {
+                sounds.playCardSnap();
+                onSendAction({ type: 'BAO_SAM', baoSam: false });
+              }}
+              className="px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-600 transition-colors cursor-pointer"
+            >
+              Bỏ Qua
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sâm Lốc: Active Sâm Caller Notification Banner */}
+      {samCaller && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-30 pointer-events-none px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-600 via-rose-600 to-amber-600 border border-yellow-300 shadow-xl text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 animate-pulse">
+          <span>🔥</span>
+          <span>{samCaller.name} ĐÃ BÁO SÂM! HÃY TÌM CÁCH CHẶN BÀI!</span>
+        </div>
+      )}
+
       {/* Quick Hand Sorting Corner Widget (Góc Màn Hình) */}
       <div className="absolute right-6 top-8 flex flex-col items-end gap-1.5 z-30 pointer-events-auto">
         <div className="flex items-center gap-1 p-1 bg-slate-900/90 border border-slate-700/80 rounded-2xl shadow-xl backdrop-blur-md">
@@ -520,9 +604,13 @@ export const TienLenTableView: React.FC<TienLenTableViewProps> = ({
                   ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30'
                   : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white'
               }`}
-              title="Tự động chọn cả bộ gợi ý khi bấm vào một lá bài. Tắt nếu muốn tự bấm chọn từng lá thủ công."
+              title={
+                autoSelectCombo
+                  ? 'Đang bật tự chọn cả bộ. Bấm để chuyển sang Chọn lẻ (tự do toggle từng lá bài).'
+                  : 'Đang ở chế độ Chọn lẻ (tự do toggle từng lá bài, không tự chọn bộ). Bấm để chuyển sang Chọn cả bộ.'
+              }
             >
-              <span>{autoSelectCombo ? '⚡ Chọn cả bộ: BẬT' : '🖐 Chọn lẻ: BẬT'}</span>
+              <span>{autoSelectCombo ? '⚡ Chọn cả bộ' : '🖐 Chọn lẻ để toggle'}</span>
             </button>
 
             {comboPreview && (

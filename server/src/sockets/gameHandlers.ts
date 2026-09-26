@@ -10,6 +10,7 @@ import { CaseEngine } from '../engines/cases/CaseEngine';
 import { UpgradeEngine } from '../engines/upgrade/UpgradeEngine';
 import { BattleEngine } from '../engines/cases/BattleEngine';
 import { SlotsManager } from '../engines/slots/SlotsManager';
+import { GiftcodeManager } from '../auth/GiftcodeManager';
 
 export function registerSocketHandlers(
   io: Server,
@@ -23,7 +24,8 @@ export function registerSocketHandlers(
   caseEngine?: CaseEngine,
   upgradeEngine?: UpgradeEngine,
   battleEngine?: BattleEngine,
-  slotsManager?: SlotsManager
+  slotsManager?: SlotsManager,
+  giftcodeManager?: GiftcodeManager
 ) {
   const formatPlayerDTO = (p: any) => ({
     id: p.id,
@@ -894,6 +896,118 @@ export function registerSocketHandlers(
           callback(res);
         }
       });
+
+      socket.on('slots:offer-get', (data: any, callback: Function) => {
+        const { slotId, userId } = data || {};
+        if (!userId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Chưa đăng nhập.' });
+          return;
+        }
+        const offer = slotsManager.getOffer(slotId || 'caishen-wins', userId);
+        if (typeof callback === 'function') {
+          callback({ success: true, offer });
+        }
+      });
+
+      socket.on('slots:mults', (data: any, callback: Function) => {
+        const { slotId, userId } = data || {};
+        if (!userId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Chưa đăng nhập.' });
+          return;
+        }
+        const mults = slotsManager.getMults(slotId || 'cocktail-nights', userId);
+        if (typeof callback === 'function') {
+          callback({ success: true, mults });
+        }
+      });
+
+      socket.on('slots:offer-resolve', (data: any, callback: Function) => {
+        const { slotId, userId, action } = data || {};
+        if (!userId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Vui lòng đăng nhập để chơi.' });
+          return;
+        }
+        if (action !== 'accept' && action !== 'gamble-spins' && action !== 'gamble-mult') {
+          if (typeof callback === 'function') callback({ success: false, message: 'Hành động không hợp lệ.' });
+          return;
+        }
+        const res = slotsManager.resolveOffer(slotId || 'caishen-wins', userId, action);
+        if (typeof callback === 'function') {
+          callback(res);
+        }
+      });
     }
+
+    // User subscription for real-time notifications (e.g. money transfer received)
+    socket.on('user:subscribe', (data: any) => {
+      const { userId } = data || {};
+      if (userId) {
+        socket.join(`user:${userId}`);
+      }
+    });
+
+    // Wallet: Transfer coins between users
+    socket.on('wallet:transfer', (data: any, callback: Function) => {
+      const { senderId, recipientQuery, amount, note } = data || {};
+      const result = userManager.transferBalance(senderId, recipientQuery, amount, note);
+      if (result.success && result.transaction && result.recipientUser) {
+        // Update sender balance on current socket
+        socket.emit('balance_updated', { balance: result.senderNewBalance });
+
+        // Update recipient balance & push real-time received notification if online
+        io.to(`user:${result.recipientUser.id}`).emit('balance_updated', {
+          balance: result.recipientNewBalance
+        });
+        io.to(`user:${result.recipientUser.id}`).emit('wallet:received', {
+          senderName: result.transaction.senderDisplayName,
+          senderUsername: result.transaction.senderUsername,
+          amount: result.transaction.amount,
+          note: result.transaction.note,
+          newBalance: result.recipientNewBalance,
+          timestamp: result.transaction.timestamp
+        });
+      }
+      if (typeof callback === 'function') {
+        callback(result);
+      }
+    });
+
+    // Wallet: Get user transfer history
+    socket.on('wallet:get-history', (data: any, callback: Function) => {
+      const { userId } = data || {};
+      if (!userId) {
+        if (typeof callback === 'function') callback({ success: false, message: 'Thiếu userId.' });
+        return;
+      }
+      const transactions = userManager.getUserTransactions(userId);
+      if (typeof callback === 'function') {
+        callback({ success: true, transactions });
+      }
+    });
+
+    // Wallet: Search players by username or display name
+    socket.on('wallet:search-users', (data: any, callback: Function) => {
+      const { query, excludeUserId } = data || {};
+      const users = userManager.searchUsers(query || '', excludeUserId);
+      if (typeof callback === 'function') {
+        callback({ success: true, users });
+      }
+    });
+
+    // Giftcode: Redeem giftcode (e.g. dinhvantrinh)
+    socket.on('giftcode:redeem', (data: any, callback: Function) => {
+      const { userId, code } = data || {};
+      if (!giftcodeManager) {
+        if (typeof callback === 'function') callback({ success: false, message: 'Hệ thống Giftcode đang bảo trì.' });
+        return;
+      }
+      const result = giftcodeManager.redeem(userId, code);
+      if (result.success && result.newBalance !== undefined) {
+        socket.emit('balance_updated', { balance: result.newBalance });
+      }
+      if (typeof callback === 'function') {
+        callback(result);
+      }
+    });
   });
 }

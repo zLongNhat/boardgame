@@ -20,6 +20,7 @@ export interface UserStats {
   unoWins: number;
   explodingKittensWins: number;
   tienLenWins: number;
+  samWins?: number;
   totalWins: number;
   totalGames: number;
 }
@@ -47,12 +48,27 @@ export interface PublicUser {
   stats: UserStats;
 }
 
+export interface TransferTransaction {
+  id: string;
+  senderId: string;
+  senderUsername: string;
+  senderDisplayName: string;
+  recipientId: string;
+  recipientUsername: string;
+  recipientDisplayName: string;
+  amount: number;
+  note?: string;
+  timestamp: number;
+}
+
 export class UserManager {
   private dataFilePath: string;
   private sessionsFilePath: string;
+  private transactionsFilePath: string;
   private users: Map<string, User> = new Map(); // id -> User
   private usernameIndex: Map<string, string> = new Map(); // lowercase username -> id
   private tokenToUserIdMap: Map<string, { userId: string; expiresAt: number }> = new Map(); // token -> session
+  private transactions: TransferTransaction[] = [];
   // Ghi nhớ đăng nhập 30 ngày; không ghi nhớ 24 giờ
   private readonly REMEMBER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
   private readonly SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -60,9 +76,11 @@ export class UserManager {
   constructor(customPath?: string) {
     this.dataFilePath = customPath || path.resolve(__dirname, '../../../data/users.json');
     this.sessionsFilePath = path.resolve(path.dirname(this.dataFilePath), 'sessions.json');
+    this.transactionsFilePath = path.resolve(path.dirname(this.dataFilePath), 'transactions.json');
     this.ensureDataDir();
     this.loadUsers();
     this.loadSessions();
+    this.loadTransactions();
   }
 
   /**
@@ -102,9 +120,18 @@ export class UserManager {
         console.log(`[UserManager] Restored ${restored.size} sessions from Redis.`);
       }
 
+      const rawTx = await redisGet(PERSISTED_KEYS.KEY_TRANSACTIONS);
+      if (rawTx) {
+        try {
+          this.transactions = JSON.parse(rawTx);
+          console.log(`[UserManager] Loaded ${this.transactions.length} transactions from Redis.`);
+        } catch {}
+      }
+
       // Keep the local file cache in sync with the authoritative state
       this.saveUsers();
       this.saveSessions();
+      this.saveTransactions();
     } catch (err) {
       console.warn('[UserManager] Redis init failed, keeping local/file state:', err instanceof Error ? err.message : err);
     }
@@ -189,6 +216,29 @@ export class UserManager {
       );
     } catch (err) {
       console.error('[UserManager] Error saving users:', err);
+    }
+  }
+
+  private loadTransactions() {
+    try {
+      if (!fs.existsSync(this.transactionsFilePath)) return;
+      const raw = fs.readFileSync(this.transactionsFilePath, 'utf-8');
+      this.transactions = JSON.parse(raw);
+    } catch (err) {
+      console.error('[UserManager] Error loading transactions:', err);
+    }
+  }
+
+  private saveTransactions() {
+    try {
+      this.ensureDataDir();
+      fs.writeFileSync(this.transactionsFilePath, JSON.stringify(this.transactions, null, 2), 'utf-8');
+      scheduleRemoteSave(
+        PERSISTED_KEYS.KEY_TRANSACTIONS,
+        () => JSON.stringify(this.transactions)
+      );
+    } catch (err) {
+      console.error('[UserManager] Error saving transactions:', err);
     }
   }
 
@@ -385,7 +435,7 @@ export class UserManager {
   }
 
   public recordGameResult(
-    gameType: 'uno' | 'exploding-kittens' | 'tien-len',
+    gameType: 'uno' | 'exploding-kittens' | 'tien-len' | 'sam',
     participantUserIds: string[],
     winnerUserIds: string[]
   ) {
@@ -411,6 +461,8 @@ export class UserManager {
           user.stats.explodingKittensWins += 1;
         } else if (gameType === 'tien-len') {
           user.stats.tienLenWins += 1;
+        } else if (gameType === 'sam') {
+          user.stats.samWins = (user.stats.samWins || 0) + 1;
         }
         modified = true;
       }
@@ -421,7 +473,7 @@ export class UserManager {
     }
   }
 
-  public getLeaderboard(gameType: 'all' | 'uno' | 'exploding-kittens' | 'tien-len' | 'money' = 'all'): PublicUser[] {
+  public getLeaderboard(gameType: 'all' | 'uno' | 'exploding-kittens' | 'tien-len' | 'sam' | 'money' = 'all'): PublicUser[] {
     const list = Array.from(this.users.values()).map(u => this.toPublicUser(u));
 
     if (gameType === 'money') {
@@ -432,6 +484,8 @@ export class UserManager {
       list.sort((a, b) => b.stats.explodingKittensWins - a.stats.explodingKittensWins || b.stats.totalWins - a.stats.totalWins);
     } else if (gameType === 'tien-len') {
       list.sort((a, b) => b.stats.tienLenWins - a.stats.tienLenWins || b.stats.totalWins - a.stats.totalWins);
+    } else if (gameType === 'sam') {
+      list.sort((a, b) => (b.stats.samWins || 0) - (a.stats.samWins || 0) || b.stats.totalWins - a.stats.totalWins);
     } else {
       list.sort((a, b) => b.stats.totalWins - a.stats.totalWins || b.stats.totalGames - a.stats.totalGames);
     }
@@ -478,6 +532,135 @@ export class UserManager {
   public getBalance(userId: string): number {
     const user = this.users.get(userId);
     return user?.balance ?? 0;
+  }
+
+  // ========== TRANSFER MANAGEMENT ==========
+
+  public transferBalance(
+    senderId: string,
+    recipientQuery: string,
+    amount: number,
+    note?: string
+  ): {
+    success: boolean;
+    message: string;
+    senderNewBalance?: number;
+    recipientNewBalance?: number;
+    recipientUser?: PublicUser;
+    transaction?: TransferTransaction;
+  } {
+    if (!senderId) {
+      return { success: false, message: 'Vui lòng đăng nhập để thực hiện chuyển tiền.' };
+    }
+
+    const sender = this.users.get(senderId);
+    if (!sender) {
+      return { success: false, message: 'Tài khoản người gửi không tồn tại.' };
+    }
+
+    const cleanAmount = Math.floor(Number(amount));
+    if (isNaN(cleanAmount) || cleanAmount < 1) {
+      return { success: false, message: 'Số tiền chuyển tối thiểu là 1 🪙.' };
+    }
+
+    if ((sender.balance || 0) < cleanAmount) {
+      return {
+        success: false,
+        message: `Số dư không đủ. Bạn có ${(sender.balance || 0).toLocaleString('vi-VN')} 🪙, cần ${cleanAmount.toLocaleString('vi-VN')} 🪙.`
+      };
+    }
+
+    if (!recipientQuery || typeof recipientQuery !== 'string') {
+      return { success: false, message: 'Vui lòng nhập tên tài khoản hoặc ID người nhận.' };
+    }
+
+    const cleanQuery = recipientQuery.trim();
+    let recipient: User | undefined;
+
+    // 1. Search by exact user ID
+    if (this.users.has(cleanQuery)) {
+      recipient = this.users.get(cleanQuery);
+    }
+    // 2. Search by lowercase username
+    if (!recipient) {
+      const recipientId = this.usernameIndex.get(cleanQuery.toLowerCase());
+      if (recipientId) {
+        recipient = this.users.get(recipientId);
+      }
+    }
+    // 3. Search by exact displayName
+    if (!recipient) {
+      for (const u of this.users.values()) {
+        if (u.displayName.toLowerCase() === cleanQuery.toLowerCase()) {
+          recipient = u;
+          break;
+        }
+      }
+    }
+
+    if (!recipient) {
+      return { success: false, message: `Không tìm thấy người nhận "${cleanQuery}". Vui lòng kiểm tra lại tên đăng nhập.` };
+    }
+
+    if (recipient.id === sender.id) {
+      return { success: false, message: 'Bạn không thể tự chuyển tiền cho chính mình!' };
+    }
+
+    // Execute transfer
+    sender.balance = (sender.balance || 0) - cleanAmount;
+    recipient.balance = (recipient.balance || 0) + cleanAmount;
+
+    const tx: TransferTransaction = {
+      id: 'tx_' + crypto.randomUUID().slice(0, 8),
+      senderId: sender.id,
+      senderUsername: sender.username,
+      senderDisplayName: sender.displayName,
+      recipientId: recipient.id,
+      recipientUsername: recipient.username,
+      recipientDisplayName: recipient.displayName,
+      amount: cleanAmount,
+      note: (note || '').trim().slice(0, 100),
+      timestamp: Date.now()
+    };
+
+    this.transactions.unshift(tx);
+    if (this.transactions.length > 500) {
+      this.transactions.pop();
+    }
+
+    this.saveUsers();
+    this.saveTransactions();
+
+    console.log(`[Transfer] ${sender.displayName} (@${sender.username}) transferred ${cleanAmount} coins to ${recipient.displayName} (@${recipient.username}). Note: "${tx.note}"`);
+
+    return {
+      success: true,
+      message: `Chuyển thành công ${cleanAmount.toLocaleString('vi-VN')} 🪙 cho ${recipient.displayName}!`,
+      senderNewBalance: sender.balance,
+      recipientNewBalance: recipient.balance,
+      recipientUser: this.toPublicUser(recipient),
+      transaction: tx
+    };
+  }
+
+  public getUserTransactions(userId: string): TransferTransaction[] {
+    return this.transactions
+      .filter(tx => tx.senderId === userId || tx.recipientId === userId)
+      .slice(0, 50);
+  }
+
+  public searchUsers(query: string, excludeUserId?: string): PublicUser[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const results: PublicUser[] = [];
+    for (const u of this.users.values()) {
+      if (excludeUserId && u.id === excludeUserId) continue;
+      if (u.username.toLowerCase().includes(q) || u.displayName.toLowerCase().includes(q)) {
+        results.push(this.toPublicUser(u));
+        if (results.length >= 8) break;
+      }
+    }
+    return results;
   }
 
   // ========== INVENTORY MANAGEMENT ==========

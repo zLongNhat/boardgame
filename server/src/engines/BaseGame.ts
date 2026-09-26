@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-export type GameType = 'uno' | 'exploding-kittens' | 'tien-len';
+export type GameType = 'uno' | 'exploding-kittens' | 'tien-len' | 'sam';
 
 export interface BasePlayer {
   id: string;

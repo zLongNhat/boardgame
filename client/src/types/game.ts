@@ -1,4 +1,4 @@
-export type GameType = 'uno' | 'exploding-kittens' | 'tien-len';
+export type GameType = 'uno' | 'exploding-kittens' | 'tien-len' | 'sam';
 export type SoloGameType = 'tai-xiu' | 'mines' | 'goals';
 export type AppView =
   | 'dashboard'
@@ -81,6 +81,7 @@ export interface UserStats {
   unoWins: number;
   explodingKittensWins: number;
   tienLenWins: number;
+  samWins?: number;
   totalWins: number;
   totalGames: number;
 }
@@ -366,7 +367,40 @@ export interface MaskedTLGameState {
   logs: GameLogEntry[];
 }
 
-export type AnyMaskedGameState = MaskedUnoGameState | MaskedEKGameState | MaskedTLGameState;
+export interface MaskedSamPlayer {
+  id: string;
+  name: string;
+  avatar: string;
+  isBot: boolean;
+  connected: boolean;
+  cardCount: number;
+  hasPassedCurrentRound: boolean;
+  rank?: number;
+  isCong?: boolean;
+  isBaoSam?: boolean;
+  isBaoMot?: boolean;
+  isDenSam?: boolean;
+}
+
+export interface MaskedSamGameState {
+  gameType: 'sam';
+  phase: 'bao_sam' | 'playing' | 'ended';
+  samCallerId?: string;
+  baoSamDeadline?: number;
+  players: MaskedSamPlayer[];
+  currentTurnIndex: number;
+  direction: 1 | -1;
+  turnTimeLimit: number;
+  turnStartTime: number;
+  isGameOver: boolean;
+  winners: string[];
+  myHand: TLCard[];
+  currentTrick: PlayedTrick | null;
+  trickHistory: PlayedTrick[];
+  logs: GameLogEntry[];
+}
+
+export type AnyMaskedGameState = MaskedUnoGameState | MaskedEKGameState | MaskedTLGameState | MaskedSamGameState;
 
 // ========== CURRENCY & TRANSACTIONS ==========
 
@@ -597,6 +631,26 @@ export type SlotSymbolId =
   | 'mj_bamboo5'
   | 'mj_dots3'
   | 'mj_bamboo2'
+  | 'aztec_mask'
+  | 'aztec_chief'
+  | 'aztec_statue'
+  | 'aztec_snake'
+  | 'aztec_carving_blue'
+  | 'aztec_carving_green'
+  | 'caishen_lion'
+  | 'caishen_toad'
+  | 'caishen_koi'
+  | 'caishen_angpao'
+  | 'caishen_cymbal'
+  | 'caishen_firecracker'
+  | 'caishen_god'
+  | 'cocktail_bottle'
+  | 'cocktail_whiskey'
+  | 'cocktail_blue'
+  | 'cocktail_green'
+  | 'cocktail_lemon'
+  | 'cocktail_shot'
+  | '10'
   | 'wild'
   | 'scatter';
 
@@ -604,8 +658,18 @@ export interface SlotTile {
   id: string;
   symbol: SlotSymbolId;
   isGold: boolean;
+  isSilver?: boolean;
+  frame?: 'none' | 'silver' | 'gold';
   isWinning?: boolean;
   transformedToWild?: boolean;
+  /** Stacked block (PG Soft: 1 symbol chiếm 2-4 ô, tính 1 ways). Chỉ ô đầu có span. */
+  span?: number;
+  /** Ô nối của stacked block (không tính ways riêng). */
+  spanCont?: boolean;
+  /** Id khối block để transform đồng bộ cả khối. */
+  block?: string;
+  /** Ô thuộc hàng top reel (hàng phụ trên cuộn 2-5). */
+  isTopReel?: boolean;
 }
 
 export interface WinningWay {
@@ -649,6 +713,17 @@ export interface SpinResult {
     total: number;
     totalWon: number;
   };
+  /** Offer chờ nhận khi trigger Free Spins Caishen (chọn Nhận hoặc Gamble). */
+  freeSpinsOffer?: {
+    spins: number;
+    mult: number;
+    gamblesLeft: number;
+  } | null;
+  /** Multiplier reel Cocktail Nights: giá trị khởi đầu + từng bước cascade. */
+  multReel?: {
+    start: number[];
+    steps: { mults: number[]; used: number[]; total: number }[];
+  } | null;
   cascades: CascadeStep[];
   totalWin: number;
   scattersCount: number;

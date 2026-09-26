@@ -5,3 +5,7 @@ dist/
 
 # Runtime game state (reseeded/reset on server start)
 data/*.json
+
+# Unrelated local files
+auto_solver/
+*.docx

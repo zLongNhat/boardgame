@@ -212,7 +212,7 @@ export const TableView: React.FC<TableViewProps> = ({
     if (gameType === 'exploding-kittens') {
       dropZoneId = document.getElementById('ek-top-card') ? 'ek-top-card' : 'ek-drop-zone';
     }
-    if (gameType === 'tien-len') {
+    if (gameType === 'tien-len' || gameType === 'sam') {
       dropZoneId = 'tienlen-drop-zone';
     }
 
@@ -233,7 +233,7 @@ export const TableView: React.FC<TableViewProps> = ({
     }
 
     return {
-      targetX: gameType === 'tien-len' ? 0 : 75,
+      targetX: (gameType === 'tien-len' || gameType === 'sam') ? 0 : 75,
       targetY: 0
     };
   };
@@ -333,8 +333,8 @@ export const TableView: React.FC<TableViewProps> = ({
       }
     }
 
-    // 3. Tiến Lên Trick Plays
-    if (gameState.gameType === 'tien-len') {
+    // 3. Tiến Lên & Sâm Lốc Trick Plays
+    if (gameState.gameType === 'tien-len' || gameState.gameType === 'sam') {
       const trick = (gameState as any).currentTrick;
       const trickId = trick ? (trick.combo?.cards?.map((c: any) => c.id).join('-') || 'trick') : '';
       if (trick && trickId && trickId !== prevTrickIdRef.current) {
@@ -342,13 +342,13 @@ export const TableView: React.FC<TableViewProps> = ({
           const opp = otherPlayers.find(p => p.id === trick.playerId);
           if (opp) {
             const { startX, startY, rotate } = getOpponentPosition(opp.id);
-            const { targetX, targetY } = getDropZonePosition('tien-len');
-            const animId = 'fly-tl-' + Date.now() + Math.random().toString(36).substring(2, 6);
+            const { targetX, targetY } = getDropZonePosition(gameState.gameType);
+            const animId = 'fly-card-' + Date.now() + Math.random().toString(36).substring(2, 6);
             sounds.playCardWhoosh();
 
             setFlyingCards(prev => [...prev, {
               id: animId,
-              gameType: 'tien-len',
+              gameType: gameState.gameType,
               card: trick.combo?.cards || [],
               playerName: opp.name,
               startX,
@@ -382,7 +382,7 @@ export const TableView: React.FC<TableViewProps> = ({
           id: animId,
           gameType: gameState.gameType,
           playerName: opp.name,
-          startX: gameState.gameType === 'tien-len' ? 0 : -75,
+          startX: (gameState.gameType === 'tien-len' || gameState.gameType === 'sam') ? 0 : -75,
           startY: 0,
           endX: startX,
           endY: startY,
@@ -440,7 +440,7 @@ export const TableView: React.FC<TableViewProps> = ({
       <div className="z-30 flex items-center justify-between px-4 py-2 bg-black/60 backdrop-blur-md border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="text-xl font-black bg-gradient-to-r from-amber-400 via-rose-400 to-yellow-400 bg-clip-text text-transparent">
-            {isUno ? 'UNO' : gameState.gameType === 'exploding-kittens' ? 'MÈO NỔ' : 'TIẾN LÊN'}
+            {isUno ? 'UNO' : gameState.gameType === 'exploding-kittens' ? 'MÈO NỔ' : gameState.gameType === 'sam' ? 'SÂM LỐC' : 'TIẾN LÊN'}
           </div>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-900 text-slate-300 font-bold border border-slate-700">
             {t('tb.room')} {room.id}
@@ -493,6 +493,8 @@ export const TableView: React.FC<TableViewProps> = ({
               ? 'bg-gradient-to-b from-[#8b0000] via-[#c92a00] to-[#e65c00] border-[#550000]'
               : gameState.gameType === 'exploding-kittens'
               ? 'bg-gradient-to-b from-[#450a0a] via-[#7f1d1d] to-[#991b1b] border-[#450a0a]'
+              : gameState.gameType === 'sam'
+              ? 'bg-gradient-to-b from-[#701a75] via-[#4a044e] to-[#2e0854] border-[#3b0764]'
               : 'bg-gradient-to-b from-[#064e3b] via-[#047857] to-[#065f46] border-[#022c22]'
           }`}
         >
@@ -654,7 +656,7 @@ export const TableView: React.FC<TableViewProps> = ({
               />
             )}
 
-            {gameState.gameType === 'tien-len' && (
+            {(gameState.gameType === 'tien-len' || gameState.gameType === 'sam') && (
               <TienLenTableView
                 gameState={gameState as any}
                 myPlayerId={player.id}

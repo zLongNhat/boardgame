@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Gamepad2,
@@ -23,12 +23,18 @@ import {
   Swords,
   Sparkles,
   Menu,
-  X
+  X,
+  Gift,
+  Send
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLang } from '../../i18n/LanguageContext';
 import { DictKey } from '../../i18n/dict';
 import { AuthModal } from '../auth/AuthModal';
+import { GiftcodeModal } from '../wallet/GiftcodeModal';
+import { TransferModal } from '../wallet/TransferModal';
+import { useGameSocketContext } from '../../hooks/GameSocketContext';
+import { sounds } from '../../utils/sound';
 
 interface NavItem {
   to: string;
@@ -111,11 +117,38 @@ export const LangToggle: React.FC<{ compact?: boolean }> = ({ compact }) => {
 export const AppShell: React.FC = () => {
   const { user, logout } = useAuth();
   const { t } = useLang();
+  const { socket } = useGameSocketContext();
   const navigate = useNavigate();
   const location = useLocation();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showGiftcodeModal, setShowGiftcodeModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [receivedToast, setReceivedToast] = useState<{
+    senderName: string;
+    amount: number;
+    note?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (socket && socket.connected && user?.id) {
+      socket.emit('user:subscribe', { userId: user.id });
+    }
+  }, [socket, socket?.connected, user?.id]);
+
+  useEffect(() => {
+    const handleReceived = (e: any) => {
+      const data = e.detail;
+      if (data) {
+        sounds.playCoinCollect();
+        setReceivedToast(data);
+        setTimeout(() => setReceivedToast(null), 6000);
+      }
+    };
+    window.addEventListener('omnideck:wallet_received', handleReceived);
+    return () => window.removeEventListener('omnideck:wallet_received', handleReceived);
+  }, []);
 
   const openAuth = (mode: 'login' | 'register') => {
     setAuthMode(mode);
@@ -215,6 +248,48 @@ export const AppShell: React.FC = () => {
                   </button>
                 );
               })}
+
+              {sIdx === 0 && (
+                <div className="flex flex-col gap-1 pt-1.5 mt-1 border-t border-gray-800/60">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowGiftcodeModal(true);
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all border border-yellow-500/20 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Gift className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                      <span className="truncate">{t('nav.giftcode')}</span>
+                    </div>
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-yellow-500/30 text-yellow-200 border border-yellow-500/40 animate-pulse">
+                      +100k
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!user) {
+                        openAuth('login');
+                      } else {
+                        setShowTransferModal(true);
+                      }
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Send className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      <span className="truncate">{t('nav.transfer')}</span>
+                    </div>
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md bg-emerald-500/30 text-emerald-200 border border-emerald-500/40">
+                      Ví
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </nav>
@@ -262,6 +337,31 @@ export const AppShell: React.FC = () => {
 
           {/* Right: Balance, Inventory, LangToggle, User Profile */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Quick Giftcode Button */}
+            <button
+              onClick={() => setShowGiftcodeModal(true)}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-yellow-500/20 via-amber-500/20 to-orange-500/20 hover:from-yellow-500/30 hover:to-orange-500/30 border border-yellow-500/40 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-black text-yellow-300 transition-all cursor-pointer shadow-inner"
+              title="Nhập Giftcode nhận xu"
+            >
+              <Gift className="w-3.5 h-3.5 text-yellow-400 animate-bounce" style={{ animationDuration: '2s' }} />
+              <span className="hidden sm:inline">{t('nav.giftcode')}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-yellow-400 text-gray-950 font-black tracking-tight leading-none">
+                +100k
+              </span>
+            </button>
+
+            {/* Quick Transfer Button */}
+            {user && (
+              <button
+                onClick={() => setShowTransferModal(true)}
+                className="flex items-center gap-1.5 bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-500/40 px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-bold text-emerald-300 transition-all cursor-pointer shadow-inner"
+                title="Chuyển tiền cho người khác"
+              >
+                <Send className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">{t('nav.transfer')}</span>
+              </button>
+            )}
+
             <LangToggle compact />
 
             {user ? (
@@ -334,8 +434,49 @@ export const AppShell: React.FC = () => {
         </main>
       </div>
 
+      {/* Real-time money transfer received toast notification */}
+      {receivedToast && (
+        <div className="fixed top-16 right-4 z-50 animate-bounce duration-500 max-w-sm p-4 rounded-2xl bg-gradient-to-r from-emerald-900/90 to-teal-900/90 border border-emerald-400 text-white shadow-2xl flex items-start gap-3 backdrop-blur-md">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center flex-shrink-0 text-gray-950 font-black text-lg">
+            🪙
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-black text-sm text-emerald-300">
+              Nhận Tiền Thành Công!
+            </div>
+            <div className="text-xs font-bold text-white">
+              +{receivedToast.amount.toLocaleString('vi-VN')} 🪙 từ {receivedToast.senderName}
+            </div>
+            {receivedToast.note && (
+              <div className="text-[11px] text-gray-300 italic mt-0.5">
+                "{receivedToast.note}"
+              </div>
+            )}
+          </div>
+          <button onClick={() => setReceivedToast(null)} className="text-gray-400 hover:text-white p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {showAuthModal && (
         <AuthModal isOpen={showAuthModal} initialMode={authMode} onClose={() => setShowAuthModal(false)} />
+      )}
+
+      {showGiftcodeModal && (
+        <GiftcodeModal
+          isOpen={showGiftcodeModal}
+          onClose={() => setShowGiftcodeModal(false)}
+          onOpenAuth={() => openAuth('login')}
+        />
+      )}
+
+      {showTransferModal && (
+        <TransferModal
+          isOpen={showTransferModal}
+          onClose={() => setShowTransferModal(false)}
+          onOpenAuth={() => openAuth('login')}
+        />
       )}
     </div>
   );

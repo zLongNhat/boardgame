@@ -100,6 +100,10 @@ export function useGameSocket() {
       window.dispatchEvent(new CustomEvent('omnideck:balance_updated', { detail: data }));
     });
 
+    s.on('wallet:received', (data: any) => {
+      window.dispatchEvent(new CustomEvent('omnideck:wallet_received', { detail: data }));
+    });
+
     setSocket(s);
 
     return () => {

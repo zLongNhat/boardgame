@@ -270,14 +270,17 @@ export function getSuggestedCombos(
       });
     }
 
-    // Lowest straight 3
-    const straights = findStraights(hand, 3);
-    if (straights.length > 0) {
-      suggestions.push({
-        label: `Sảnh (${straights[0][0].value}➔${straights[0][2].value})`,
-        cards: straights[0],
-        type: 'straight'
-      });
+    // Suggest straights (from length 10 down to 3)
+    for (let len = 10; len >= 3; len--) {
+      const straights = findStraights(hand, len);
+      if (straights.length > 0) {
+        suggestions.push({
+          label: `Sảnh ${len} lá (${straights[0][0].value}➔${straights[0][len - 1].value})`,
+          cards: straights[0],
+          type: 'straight'
+        });
+        break;
+      }
     }
 
     return suggestions;
@@ -668,7 +671,8 @@ export function findMatchingComboForCard(
     return [...sameRank].sort((a, b) => a.overallRank - b.overallRank);
   }
 
-  for (let len = 5; len >= 3; len--) {
+  // Expand straight suggestion to include 6, 7, 8, 9, 10, 11, 12 cards
+  for (let len = 12; len >= 3; len--) {
     const straights = findStraights(hand, len).filter(s => s.some(c => c.id === targetCard.id));
     if (straights.length > 0) return straights[0];
   }

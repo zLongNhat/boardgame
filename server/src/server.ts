@@ -14,6 +14,7 @@ import { CaseEngine } from './engines/cases/CaseEngine';
 import { UpgradeEngine } from './engines/upgrade/UpgradeEngine';
 import { BattleEngine } from './engines/cases/BattleEngine';
 import { SlotsManager } from './engines/slots/SlotsManager';
+import { GiftcodeManager } from './auth/GiftcodeManager';
 import { registerSocketHandlers } from './sockets/gameHandlers';
 import { flushRemoteSaves } from './storage/redisRest';
 
@@ -41,6 +42,7 @@ const caseEngine = new CaseEngine(userManager);
 const upgradeEngine = new UpgradeEngine(userManager);
 const battleEngine = new BattleEngine(userManager, caseEngine);
 const slotsManager = new SlotsManager(userManager);
+const giftcodeManager = new GiftcodeManager(userManager);
 
 registerSocketHandlers(
   io,
@@ -54,7 +56,8 @@ registerSocketHandlers(
   caseEngine,
   upgradeEngine,
   battleEngine,
-  slotsManager
+  slotsManager,
+  giftcodeManager
 );
 
 // Wire Case Battle events to rooms and all sockets
@@ -242,6 +245,92 @@ app.post('/api/slots/:id/spin', (req, res) => {
   res.json(spinRes);
 });
 
+// Wallet: Transfer coins between users
+app.post('/api/wallet/transfer', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập.' });
+  }
+  const token = authHeader.substring(7);
+  const user = userManager.getUserByToken(token);
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'Phiên đăng nhập không hợp lệ.' });
+  }
+  const { recipient, amount, note } = req.body;
+  const result = userManager.transferBalance(user.id, recipient, Number(amount), note);
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+
+  // Real-time broadcast balance update and notification
+  if (result.recipientUser && result.transaction) {
+    io.to(`user:${result.recipientUser.id}`).emit('balance_updated', {
+      balance: result.recipientNewBalance
+    });
+    io.to(`user:${result.recipientUser.id}`).emit('wallet:received', {
+      senderName: result.transaction.senderDisplayName,
+      senderUsername: result.transaction.senderUsername,
+      amount: result.transaction.amount,
+      note: result.transaction.note,
+      newBalance: result.recipientNewBalance,
+      timestamp: result.transaction.timestamp
+    });
+    io.to(`user:${user.id}`).emit('balance_updated', {
+      balance: result.senderNewBalance
+    });
+  }
+
+  return res.json(result);
+});
+
+// Wallet: Get user transactions
+app.get('/api/wallet/transactions', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập.' });
+  }
+  const token = authHeader.substring(7);
+  const user = userManager.getUserByToken(token);
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'Phiên đăng nhập không hợp lệ.' });
+  }
+  const transactions = userManager.getUserTransactions(user.id);
+  res.json({ success: true, transactions });
+});
+
+// Wallet: Search players for autocomplete
+app.get('/api/wallet/search', (req, res) => {
+  const query = (req.query.q as string) || '';
+  const authHeader = req.headers.authorization;
+  let excludeUserId: string | undefined;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const user = userManager.getUserByToken(authHeader.substring(7));
+    if (user) excludeUserId = user.id;
+  }
+  const users = userManager.searchUsers(query, excludeUserId);
+  res.json({ success: true, users });
+});
+
+// Giftcode: Redeem
+app.post('/api/giftcode/redeem', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'Vui lòng đăng nhập để nhập giftcode.' });
+  }
+  const token = authHeader.substring(7);
+  const user = userManager.getUserByToken(token);
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'Phiên đăng nhập không hợp lệ.' });
+  }
+  const { code } = req.body;
+  const result = giftcodeManager.redeem(user.id, code);
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+  io.to(`user:${user.id}`).emit('balance_updated', { balance: result.newBalance });
+  return res.json(result);
+});
+
 // Serve client build in production
 const clientDistPath = path.resolve(__dirname, '../../client/dist');
 app.use(express.static(clientDistPath));
@@ -262,6 +351,7 @@ const PORT = process.env.PORT || 3000;
 async function bootstrap() {
   // Restore player data from Redis (if configured) BEFORE accepting traffic
   await userManager.initRemote();
+  await giftcodeManager.initRemote();
   await taiXiuEngine.initRemote();
 
   // Start the Tai Xiu auto-running engine

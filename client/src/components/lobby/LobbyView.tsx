@@ -328,6 +328,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   const getMaxAllowed = (settings: RoomSettings): number => {
     if (settings.gameType === 'uno') return 8;
     if (settings.gameType === 'tien-len') return 4;
+    if (settings.gameType === 'sam') return 5;
     if (settings.gameType === 'exploding-kittens') {
       let max = 5;
       const exp = settings.ekExpansions;
@@ -546,11 +547,12 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">
                 {t('room.chooseGame')}
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { type: 'uno', label: 'UNO', icon: '🃏' },
                   { type: 'exploding-kittens', label: 'Mèo Nổ', icon: '💣' },
-                  { type: 'tien-len', label: 'Tiến Lên', icon: '♠️' }
+                  { type: 'tien-len', label: 'Tiến Lên', icon: '♠️' },
+                  { type: 'sam', label: 'Sâm Lốc', icon: '🎴' }
                 ].map((g) => (
                   <button
                     key={g.type}
@@ -697,6 +699,20 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
                       className="rounded text-emerald-600 focus:ring-0 bg-gray-900 border-gray-700"
                     />
                   </label>
+                </div>
+              </div>
+            )}
+
+            {room.settings.gameType === 'sam' && (
+              <div className="space-y-4 pt-4 border-t border-gray-700/50">
+                <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-200 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <span>🎴</span>
+                    <span>{t('g.samTitle')}</span>
+                  </div>
+                  <p className="text-[11px] text-rose-300/80">
+                    {t('g.samDesc')}
+                  </p>
                 </div>
               </div>
             )}

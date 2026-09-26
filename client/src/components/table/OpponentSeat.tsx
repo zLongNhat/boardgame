@@ -231,6 +231,23 @@ export const OpponentSeat: React.FC<OpponentSeatProps> = ({
           💀 ĐÃ BỊ LOẠI
         </span>
       )}
+
+      {/* Sâm Lốc Badges */}
+      {(player as any).isBaoMot && (
+        <span className="mt-1 px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] uppercase shadow animate-bounce">
+          ⚠️ BÁO 1 LÁ!
+        </span>
+      )}
+      {(player as any).isBaoSam && (
+        <span className="mt-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[10px] uppercase shadow">
+          👑 BÁO SÂM
+        </span>
+      )}
+      {(player as any).isDenSam && (
+        <span className="mt-1 px-2 py-0.5 rounded-full bg-rose-600 text-white font-black text-[10px] uppercase shadow">
+          ❌ ĐỀN SÂM
+        </span>
+      )}
     </div>
   );
 };

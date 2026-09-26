@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "node --import tsx --test src/engines/uno/UnoGame.test.ts src/engines/exploding-kittens/ExplodingKittensGame.test.ts src/engines/tien-len/TienLenGame.test.ts"
+    "test": "node --import tsx --test src/engines/uno/UnoGame.test.ts src/engines/exploding-kittens/ExplodingKittensGame.test.ts src/engines/tien-len/TienLenGame.test.ts src/engines/sam/SamGame.test.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
