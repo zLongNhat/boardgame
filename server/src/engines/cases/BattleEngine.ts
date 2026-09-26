@@ -87,8 +87,8 @@ export class BattleEngine extends EventEmitter {
       return { success: false, message: 'Số lượng người chơi phải là 2, 3 hoặc 4.' };
     }
 
-    if (!Array.isArray(caseIds) || caseIds.length < 1 || caseIds.length > 10) {
-      return { success: false, message: 'Danh sách hòm đấu phải từ 1 đến 10 hòm.' };
+    if (!Array.isArray(caseIds) || caseIds.length < 1 || caseIds.length > 50) {
+      return { success: false, message: 'Danh sách hòm đấu phải từ 1 đến 50 hòm.' };
     }
 
     // Verify all cases exist and calculate totalCost

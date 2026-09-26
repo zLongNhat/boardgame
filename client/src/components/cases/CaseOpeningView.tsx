@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Package, Sparkles, ShieldCheck, RefreshCw, ChevronRight, Layers } from 'lucide-react';
-import { CaseDefinition, CaseItemTemplate, InventoryItem, ItemRarity } from '../../types/game';
+import { CaseDefinition, CaseItemTemplate, CaseSingleSpin, InventoryItem, ItemRarity } from '../../types/game';
 import { useAuth } from '../../context/AuthContext';
 import { useGameSocketContext } from '../../hooks/GameSocketContext';
 
@@ -85,19 +85,26 @@ export const playCaseWinSound = (rarity: ItemRarity) => {
   } catch (e) {}
 };
 
+const SPIN_OPTIONS = [1, 3, 5, 10] as const;
+
 export const CaseOpeningView: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const { socket } = useGameSocketContext();
 
   const [cases, setCases] = useState<CaseDefinition[]>([]);
   const [selectedCase, setSelectedCase] = useState<CaseDefinition | null>(null);
+  const [spinCount, setSpinCount] = useState<number>(1);
   const [isOpening, setIsOpening] = useState(false);
   const [tape, setTape] = useState<CaseItemTemplate[]>([]);
   const [wonItem, setWonItem] = useState<InventoryItem | null>(null);
+  const [multiSpins, setMultiSpins] = useState<CaseSingleSpin[]>([]);
+  const [multiSummary, setMultiSummary] = useState<{ totalSpent: number; totalWonValue: number } | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
+  const [showMultiModal, setShowMultiModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const tapeContainerRef = useRef<HTMLDivElement>(null);
+  const multiTapeRefs = useRef<(HTMLDivElement | null)[]>([]);
   const ITEM_WIDTH = 140; // width of item card in tape
 
   // Load cases from server
@@ -113,23 +120,66 @@ export const CaseOpeningView: React.FC = () => {
       .catch(() => {});
   }, []);
 
+  const animateTapeEl = (el: HTMLDivElement | null, winningIdx: number, doneDelayMs: number, onDone: () => void) => {
+    if (!el) {
+      onDone();
+      return;
+    }
+    el.style.transition = 'none';
+    el.style.transform = 'translateX(0px)';
+    // force reflow
+    void el.offsetWidth;
+    setTimeout(() => {
+      if (!el) {
+        onDone();
+        return;
+      }
+      const jitter = (Math.random() - 0.5) * 60;
+      const viewportW = el.parentElement?.clientWidth || 700;
+      const targetOffset = -(winningIdx * (ITEM_WIDTH + 12) - viewportW / 2 + ITEM_WIDTH / 2) + jitter;
+      el.style.transition = 'transform 5.5s cubic-bezier(0.12, 0.8, 0.2, 1)';
+      el.style.transform = `translateX(${targetOffset}px)`;
+      let tickCount = 0;
+      const tickInterval = setInterval(() => {
+        tickCount++;
+        if (tickCount < 45) {
+          playCaseTickSound();
+        } else {
+          clearInterval(tickInterval);
+        }
+      }, 110);
+      setTimeout(() => {
+        clearInterval(tickInterval);
+        onDone();
+      }, doneDelayMs);
+    }, 80);
+  };
+
   const handleOpenCase = () => {
     if (!user) {
       setErrorMsg('Vui lòng đăng nhập để mở hòm.');
       return;
     }
     if (!selectedCase) return;
-    if (user.balance < selectedCase.price) {
-      setErrorMsg(`Không đủ tiền! Bạn có ${user.balance.toLocaleString('vi-VN')} 🪙, hòm cần ${selectedCase.price.toLocaleString('vi-VN')} 🪙.`);
+    const totalCost = selectedCase.price * spinCount;
+    if (user.balance < totalCost) {
+      setErrorMsg(`Không đủ tiền! Bạn có ${user.balance.toLocaleString('vi-VN')} 🪙, cần ${totalCost.toLocaleString('vi-VN')} 🪙 cho ${spinCount} lượt.`);
+      return;
+    }
+    if (!socket) {
+      setErrorMsg('Mất kết nối máy chủ, thử lại sau giây lát.');
       return;
     }
 
     setErrorMsg(null);
     setIsOpening(true);
     setWonItem(null);
+    setMultiSpins([]);
+    setMultiSummary(null);
     setShowResultModal(false);
+    setShowMultiModal(false);
 
-    if (socket) {
+    if (spinCount === 1) {
       socket.emit('cases:open', { userId: user.id, caseId: selectedCase.id }, (res: any) => {
         if (!res.success) {
           setErrorMsg(res.message || 'Mở hòm thất bại');
@@ -142,42 +192,51 @@ export const CaseOpeningView: React.FC = () => {
         setTape(generatedTape);
         setWonItem(res.wonItem);
 
-        // Reset scroll position
-        if (tapeContainerRef.current) {
-          tapeContainerRef.current.style.transition = 'none';
-          tapeContainerRef.current.style.transform = 'translateX(0px)';
-        }
-
-        // Animate rolling tape
         setTimeout(() => {
-          if (!tapeContainerRef.current) return;
-          // Target position: center winning item
-          // Add small jitter within the winning item box for realistic CS2 landing
-          const jitter = (Math.random() - 0.5) * 60;
-          const targetOffset = -(winningIdx * (ITEM_WIDTH + 12) - (tapeContainerRef.current.parentElement?.clientWidth || 700) / 2 + ITEM_WIDTH / 2) + jitter;
-
-          tapeContainerRef.current.style.transition = 'transform 5.5s cubic-bezier(0.12, 0.8, 0.2, 1)';
-          tapeContainerRef.current.style.transform = `translateX(${targetOffset}px)`;
-
-          // Play tick sounds as it passes
-          let tickCount = 0;
-          const tickInterval = setInterval(() => {
-            tickCount++;
-            if (tickCount < 45) {
-              playCaseTickSound();
-            } else {
-              clearInterval(tickInterval);
-            }
-          }, 110);
-
-          setTimeout(() => {
-            clearInterval(tickInterval);
+          animateTapeEl(tapeContainerRef.current, winningIdx, 5800, () => {
             setIsOpening(false);
             setShowResultModal(true);
             playCaseWinSound(res.wonItem?.rarity || 'white');
             refreshUser();
-          }, 5800);
-        }, 80);
+          });
+        }, 60);
+      });
+    } else {
+      socket.emit('cases:open-multi', { userId: user.id, caseId: selectedCase.id, count: spinCount }, (res: any) => {
+        if (!res.success) {
+          setErrorMsg(res.message || 'Mở hòm thất bại');
+          setIsOpening(false);
+          return;
+        }
+        const spins: CaseSingleSpin[] = res.spins || [];
+        setMultiSpins(spins);
+        setMultiSummary({ totalSpent: res.totalSpent || 0, totalWonValue: res.totalWonValue || 0 });
+        setTape([]);
+
+        setTimeout(() => {
+          let finished = 0;
+          const total = spins.length;
+          if (total === 0) {
+            setIsOpening(false);
+            return;
+          }
+          spins.forEach((spin, idx) => {
+            animateTapeEl(multiTapeRefs.current[idx] || null, spin.winningIndex ?? 30, 5800, () => {
+              finished++;
+              if (finished === total) {
+                setIsOpening(false);
+                setShowMultiModal(true);
+                const best: ItemRarity = spins.some(s => s.wonItem.rarity === 'gold')
+                  ? 'gold'
+                  : spins.some(s => s.wonItem.rarity === 'red')
+                    ? 'red'
+                    : 'purple';
+                playCaseWinSound(best);
+                refreshUser();
+              }
+            });
+          });
+        }, 60);
       });
     }
   };
@@ -192,10 +251,91 @@ export const CaseOpeningView: React.FC = () => {
     });
   };
 
+  const handleSellAllMulti = () => {
+    if (!socket || !user || multiSpins.length === 0) return;
+    const ids = multiSpins.map(s => s.wonItem.id);
+    let idx = 0;
+    const sellNext = () => {
+      if (idx >= ids.length) {
+        setShowMultiModal(false);
+        refreshUser();
+        return;
+      }
+      socket.emit('inventory:sell', { userId: user.id, itemId: ids[idx] }, () => {
+        idx++;
+        sellNext();
+      });
+    };
+    sellNext();
+  };
+
+  const renderTapeCards = (cards: CaseItemTemplate[]) => cards.map((item, idx) => {
+    const cfg = RARITY_CONFIG[item.rarity];
+    return (
+      <div
+        key={idx}
+        style={{ width: `${ITEM_WIDTH}px` }}
+        className={`h-36 rounded-2xl border ${cfg.border} ${cfg.bg} flex flex-col items-center justify-between p-3 flex-shrink-0 shadow-lg relative overflow-hidden`}
+      >
+        <div className="text-[10px] uppercase font-black tracking-wider text-gray-400 self-start">
+          {item.weaponType}
+        </div>
+        <div className="text-4xl my-auto transition-transform hover:scale-110 drop-shadow-md">
+          {item.icon}
+        </div>
+        <div className="w-full text-center">
+          <div className={`text-xs font-black truncate ${cfg.text}`}>{item.name}</div>
+          <div className="text-[11px] font-bold text-yellow-400 mt-0.5">{item.value.toLocaleString('vi-VN')} 🪙</div>
+        </div>
+        <div
+          className="absolute bottom-0 left-0 right-0 h-1"
+          style={{ backgroundColor: cfg.hex }}
+        />
+      </div>
+    );
+  });
+
+  const renderSingleTape = () => (
+    <div className="overflow-hidden w-full py-4 border-y border-gray-800/80 bg-gray-950/60 rounded-2xl relative">
+      <div
+        ref={tapeContainerRef}
+        className="flex items-center gap-3 px-4 will-change-transform"
+        style={{ width: 'max-content' }}
+      >
+        {renderTapeCards(tape.length > 0 ? tape : selectedCase!.items.concat(selectedCase!.items))}
+      </div>
+    </div>
+  );
+
+  const renderMultiTapes = () => (
+    <div className="flex flex-col gap-4 w-full">
+      {multiSpins.length > 0 ? multiSpins.map((spin, spinIdx) => (
+        <div key={spinIdx} className="overflow-hidden w-full py-3 border-y border-gray-800/80 bg-gray-950/60 rounded-2xl relative">
+          <div className="absolute top-1 left-3 z-10 text-[11px] font-black text-amber-300 bg-black/60 px-2 py-0.5 rounded-full border border-amber-500/40">
+            Vòng {spinIdx + 1}
+          </div>
+          <div
+            ref={(el) => { multiTapeRefs.current[spinIdx] = el; }}
+            className="flex items-center gap-3 px-4 will-change-transform"
+            style={{ width: 'max-content' }}
+          >
+            {renderTapeCards(spin.tape)}
+          </div>
+        </div>
+      )) : (
+        <div className="text-center text-xs text-gray-500 py-6 border border-dashed border-gray-800 rounded-2xl">
+          Bấm Mở {spinCount} Hòm để quay {spinCount} băng thưởng cùng lúc
+        </div>
+      )}
+    </div>
+  );
+
+  const totalCost = selectedCase ? selectedCase.price * spinCount : 0;
+
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-6 pb-12">
-      {/* 3 Case Selector Tabs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* 6 Case Selector Tabs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {cases.map((c) => {
           const isSelected = selectedCase?.id === c.id;
           return (
@@ -206,7 +346,9 @@ export const CaseOpeningView: React.FC = () => {
                 setSelectedCase(c);
                 setErrorMsg(null);
                 setTape([]);
+                setMultiSpins([]);
                 setShowResultModal(false);
+                setShowMultiModal(false);
               }}
               className={`p-5 rounded-3xl border text-left transition-all relative overflow-hidden cursor-pointer ${
                 isSelected
@@ -244,40 +386,7 @@ export const CaseOpeningView: React.FC = () => {
               <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[12px] border-b-amber-400 -mb-1" />
             </div>
 
-            {/* Overflow viewport */}
-            <div className="overflow-hidden w-full py-4 border-y border-gray-800/80 bg-gray-950/60 rounded-2xl relative">
-              <div
-                ref={tapeContainerRef}
-                className="flex items-center gap-3 px-4 will-change-transform"
-                style={{ width: 'max-content' }}
-              >
-                {(tape.length > 0 ? tape : selectedCase.items.concat(selectedCase.items)).map((item, idx) => {
-                  const cfg = RARITY_CONFIG[item.rarity];
-                  return (
-                    <div
-                      key={idx}
-                      style={{ width: `${ITEM_WIDTH}px` }}
-                      className={`h-36 rounded-2xl border ${cfg.border} ${cfg.bg} flex flex-col items-center justify-between p-3 flex-shrink-0 shadow-lg relative overflow-hidden`}
-                    >
-                      <div className="text-[10px] uppercase font-black tracking-wider text-gray-400 self-start">
-                        {item.weaponType}
-                      </div>
-                      <div className="text-4xl my-auto transition-transform hover:scale-110 drop-shadow-md">
-                        {item.icon}
-                      </div>
-                      <div className="w-full text-center">
-                        <div className={`text-xs font-black truncate ${cfg.text}`}>{item.name}</div>
-                        <div className="text-[11px] font-bold text-yellow-400 mt-0.5">{item.value.toLocaleString('vi-VN')} 🪙</div>
-                      </div>
-                      <div
-                        className="absolute bottom-0 left-0 right-0 h-1"
-                        style={{ backgroundColor: cfg.hex }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            {spinCount === 1 ? renderSingleTape() : renderMultiTapes()}
           </div>
 
           {/* Error Message */}
@@ -287,8 +396,30 @@ export const CaseOpeningView: React.FC = () => {
             </div>
           )}
 
-          {/* Action Button */}
-          <div className="mt-4 flex flex-col items-center gap-3">
+          {/* Spin count + Action Button */}
+          <div className="mt-4 flex flex-col items-center gap-3 w-full">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Số lượt quay:</span>
+              {SPIN_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  disabled={isOpening}
+                  onClick={() => {
+                    setSpinCount(n);
+                    setTape([]);
+                    setMultiSpins([]);
+                    setShowMultiModal(false);
+                  }}
+                  className={`px-4 py-2 rounded-xl font-black text-sm transition-all cursor-pointer border ${
+                    spinCount === n
+                      ? 'bg-amber-500 text-gray-950 border-amber-400 shadow-lg shadow-amber-500/30'
+                      : 'bg-gray-800 text-gray-300 border-gray-700 hover:border-amber-500/50'
+                  }`}
+                >
+                  x{n}
+                </button>
+              ))}
+            </div>
             <button
               disabled={isOpening}
               onClick={handleOpenCase}
@@ -300,11 +431,11 @@ export const CaseOpeningView: React.FC = () => {
             >
               {isOpening ? (
                 <>
-                  <RefreshCw className="w-6 h-6 animate-spin" /> Đang Quay Thưởng...
+                  <RefreshCw className="w-6 h-6 animate-spin" /> Đang Quay {spinCount > 1 ? `${spinCount} Vòng` : 'Thưởng'}...
                 </>
               ) : (
                 <>
-                  <Package className="w-6 h-6" /> Mở Hòm ({selectedCase.price.toLocaleString('vi-VN')} 🪙)
+                  <Package className="w-6 h-6" /> Mở {spinCount > 1 ? `${spinCount} Hòm` : 'Hòm'} ({totalCost.toLocaleString('vi-VN')} 🪙)
                 </>
               )}
             </button>
@@ -339,6 +470,7 @@ export const CaseOpeningView: React.FC = () => {
                     <div className="text-3xl my-1">{item.icon}</div>
                     <div>
                       <div className={`text-xs font-bold truncate max-w-full ${cfg.text}`}>{item.name}</div>
+                      <div className="text-[10px] text-gray-400 font-medium">{item.weaponType}</div>
                       <div className="text-[11px] font-bold text-yellow-400 mt-1">{item.value.toLocaleString('vi-VN')} 🪙</div>
                     </div>
                     <div className="absolute top-1 right-2 text-[9px] uppercase font-bold text-gray-400">{item.rarity}</div>
@@ -350,7 +482,7 @@ export const CaseOpeningView: React.FC = () => {
         </div>
       )}
 
-      {/* Won Item Celebration Modal */}
+      {/* Won Item Celebration Modal (single) */}
       <AnimatePresence>
         {showResultModal && wonItem && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -393,7 +525,58 @@ export const CaseOpeningView: React.FC = () => {
                   onClick={() => handleQuickSell(wonItem.id)}
                   className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-gray-950 font-black text-sm transition-all shadow-lg shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-1"
                 >
-                  Bán Ngay (+{wonItem.value} 🪙)
+                  Bán Ngay (+{wonItem.value.toLocaleString('vi-VN')} 🪙)
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Multi-spin result modal */}
+      <AnimatePresence>
+        {showMultiModal && multiSpins.length > 0 && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="max-w-2xl w-full max-h-[85vh] overflow-y-auto rounded-3xl border-2 border-amber-500/60 bg-gray-900 p-6 shadow-2xl"
+            >
+              <div className="text-xs font-black uppercase tracking-widest text-amber-300 mb-2 flex items-center gap-1.5 justify-center">
+                <Sparkles className="w-4 h-4" /> KẾT QUẢ {multiSpins.length} VÒNG QUAY!
+              </div>
+              {multiSummary && (
+                <div className="flex items-center justify-center gap-4 text-xs font-bold mb-4">
+                  <span className="text-gray-400">Đã chi: <span className="text-red-400">-{multiSummary.totalSpent.toLocaleString('vi-VN')} 🪙</span></span>
+                  <span className="text-gray-400">Tổng trúng: <span className="text-emerald-400">+{multiSummary.totalWonValue.toLocaleString('vi-VN')} 🪙</span></span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
+                {multiSpins.map((spin, idx) => {
+                  const cfg = RARITY_CONFIG[spin.wonItem.rarity];
+                  return (
+                    <div key={idx} className={`p-3 rounded-2xl border ${cfg.border} ${cfg.bg} flex flex-col items-center text-center gap-1`}>
+                      <div className="text-[10px] font-black text-amber-300">Vòng {idx + 1}</div>
+                      <div className="text-3xl">{spin.wonItem.icon}</div>
+                      <div className={`text-[11px] font-bold truncate max-w-full ${cfg.text}`}>{spin.wonItem.name}</div>
+                      <div className="text-[11px] font-bold text-yellow-400">{spin.wonItem.value.toLocaleString('vi-VN')} 🪙</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 w-full">
+                <button
+                  onClick={() => setShowMultiModal(false)}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold text-sm transition-colors cursor-pointer"
+                >
+                  Giữ Tất Cả Trong Kho
+                </button>
+                <button
+                  onClick={handleSellAllMulti}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-gray-950 font-black text-sm transition-all shadow-lg shadow-amber-500/20 cursor-pointer"
+                >
+                  Bán Tất Cả (+{(multiSummary?.totalWonValue || 0).toLocaleString('vi-VN')} 🪙)
                 </button>
               </div>
             </motion.div>

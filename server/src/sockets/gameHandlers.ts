@@ -706,6 +706,21 @@ export function registerSocketHandlers(
           callback(result);
         }
       });
+
+      socket.on('cases:open-multi', (data: any, callback: Function) => {
+        const { userId, caseId, count } = data || {};
+        if (!userId) {
+          if (typeof callback === 'function') callback({ success: false, message: 'Chưa đăng nhập.' });
+          return;
+        }
+        const result = caseEngine.openCases(userId, caseId, count);
+        if (result.success && result.newBalance !== undefined) {
+          socket.emit('balance_updated', { balance: result.newBalance });
+        }
+        if (typeof callback === 'function') {
+          callback(result);
+        }
+      });
     }
 
     // ========== INVENTORY SYSTEM ==========

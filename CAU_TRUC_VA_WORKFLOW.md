@@ -205,11 +205,15 @@ proj/
 ---
 
 ### Workflow 6: Mở Hòm Vũ Khí CS2
-1. **4 Hạng Hòm Theo Kinh Tế Người Chơi (avg ~58k)**:
+1. **6 Hạng Hòm Theo Kinh Tế Người Chơi (41–42 skins/hòm, RTP ~95%)**:
    - **Hòm Tân Thủ**: 5,000 🪙
    - **Hòm Chiến Binh**: 25,000 🪙
    - **Hòm Thượng Cổ**: 100,000 🪙
    - **Hòm Rồng Hoàng Kim (Immortal)**: 1,000,000 🪙
+   - **Hòm Huyền Thoại (Legendary)**: 10,000,000 🪙
+   - **Hòm Chí Tôn (Mythic)**: 100,000,000 🪙
+   - Mỗi hòm ~41 skins đủ 8 loại vũ khí (Pistol/SMG/Shotgun/Rifle/Sniper/Machinegun/Knife/Gloves).
+   - Chế độ quay x1/x3/x5/x10 vòng cùng lúc (`cases:open-multi`); thi đấu Case Battle tối đa 50 hòm/trận.
 2. **5 Cấp Độ Hiếm (Rarity)**:
    - ⚪ **Trắng (Phổ thông - 54%)**: Giá trị $0.3\times - 0.6\times$ giá hòm.
    - 🔵 **Xanh (Hiếm - 28%)**: Giá trị $0.7\times - 0.8\times$ giá hòm.

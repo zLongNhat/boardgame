@@ -79,8 +79,8 @@ export const BattleLobbyView: React.FC<Props> = ({ onSelectBattle }) => {
   }, 0);
 
   const handleAddCase = (cId: string) => {
-    if (selectedCaseIds.length >= 10) {
-      setErrorMsg('Tối đa 10 hòm trong một trận đấu.');
+    if (selectedCaseIds.length >= 50) {
+      setErrorMsg('Tối đa 50 hòm trong một trận đấu.');
       return;
     }
     setSelectedCaseIds(prev => [...prev, cId]);
@@ -426,7 +426,7 @@ export const BattleLobbyView: React.FC<Props> = ({ onSelectBattle }) => {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    3. Chọn Danh Sách Hòm Đấu ({selectedCaseIds.length}/10):
+                    3. Chọn Danh Sách Hòm Đấu ({selectedCaseIds.length}/50):
                   </label>
                   <span className="text-xs font-black text-yellow-400">
                     Tổng vé: {createTotalCost.toLocaleString('vi-VN')} 🪙

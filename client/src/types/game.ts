@@ -61,6 +61,21 @@ export interface CaseOpenResult {
   message?: string;
 }
 
+export interface CaseSingleSpin {
+  wonItem: InventoryItem;
+  tape: CaseItemTemplate[];
+  winningIndex: number;
+}
+
+export interface CaseOpenMultiResult {
+  success: boolean;
+  spins?: CaseSingleSpin[];
+  totalSpent?: number;
+  totalWonValue?: number;
+  newBalance?: number;
+  message?: string;
+}
+
 export interface UpgradeResult {
   success: boolean;
   isWin?: boolean;
