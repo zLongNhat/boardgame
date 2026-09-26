@@ -7,8 +7,6 @@ import {
   Sparkles,
   HelpCircle,
   X,
-  Play,
-  Pause,
   Award
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -17,6 +15,7 @@ import { CascadeStep, FreeSpinsState, SpinResult, SlotTile, SlotSymbolId } from 
 import { TileAnimationPhase } from './WildBountySymbols';
 import { CocktailNightsTile, preloadCocktailAssets } from './CocktailNightsSymbols';
 import { ReelColumnView } from './ReelColumnView';
+import { AutoSpinMenu } from './AutoSpinMenu';
 
 const REEL_HEIGHTS = [5, 5, 5, 5, 5, 5];
 const BET_PRESETS = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
@@ -875,35 +874,17 @@ export const CocktailNightsSlot: React.FC = () => {
           +
         </button>
 
-        <button
+        <AutoSpinMenu
+          variant="round"
+          active={autoSpinCount !== null}
+          remaining={autoSpinCount}
           disabled={isSpinning && autoSpinCount === null}
-          onClick={() => {
-            if (autoSpinCount !== null) {
-              setAutoSpinCount(null);
-            } else {
-              setAutoSpinCount(25);
-              handleSpin();
-            }
+          onSelect={count => {
+            setAutoSpinCount(count);
+            handleSpin();
           }}
-          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex flex-col items-center justify-center border-2 transition-all active:scale-90 ${
-            autoSpinCount !== null
-              ? 'bg-pink-950/80 border-pink-500 text-pink-300 animate-pulse shadow-[0_0_15px_rgba(255,45,149,0.6)]'
-              : 'bg-[#1a1230]/90 hover:bg-[#241a3f] border-pink-900/50 text-gray-400 hover:text-gray-200 shadow-md'
-          }`}
-          title={autoSpinCount !== null ? 'Dừng Tự Động' : 'Bật Quay Tự Động'}
-        >
-          {autoSpinCount !== null ? (
-            <>
-              <Pause className="w-4 h-4 text-pink-400" />
-              <span className="text-[8px] font-black uppercase text-pink-300">{autoSpinCount}</span>
-            </>
-          ) : (
-            <>
-              <Play className="w-4 h-4 text-cyan-400" />
-              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-tight mt-0.5">AUTO</span>
-            </>
-          )}
-        </button>
+          onStop={() => setAutoSpinCount(null)}
+        />
       </div>
 
       {/* Feature Buy Modal */}

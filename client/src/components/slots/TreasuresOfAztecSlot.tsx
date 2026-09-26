@@ -8,8 +8,6 @@ import {
   Sparkles,
   HelpCircle,
   X,
-  Play,
-  Pause,
   Award
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -18,6 +16,7 @@ import { CascadeStep, FreeSpinsState, SpinResult, SlotTile, SlotSymbolId } from 
 import { TileAnimationPhase } from './WildBountySymbols';
 import { TreasuresOfAztecTile } from './TreasuresOfAztecSymbols';
 import { ReelColumnView } from './ReelColumnView';
+import { AutoSpinMenu } from './AutoSpinMenu';
 
 const REEL_HEIGHTS = [5, 6, 6, 6, 6, 5];
 const BET_PRESETS = [10, 50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000];
@@ -956,34 +955,16 @@ export const TreasuresOfAztecSlot: React.FC = () => {
               <span>Turbo</span>
             </button>
 
-            <button
+            <AutoSpinMenu
+              active={autoSpinCount !== null}
+              remaining={autoSpinCount}
               disabled={isSpinning && autoSpinCount === null}
-              onClick={() => {
-                if (autoSpinCount !== null) {
-                  setAutoSpinCount(null);
-                } else {
-                  setAutoSpinCount(25);
-                  handleSpin();
-                }
+              onSelect={count => {
+                setAutoSpinCount(count);
+                handleSpin();
               }}
-              className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
-                autoSpinCount !== null
-                  ? 'bg-rose-500/20 border-rose-500/60 text-rose-300 animate-pulse'
-                  : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-stone-200'
-              }`}
-            >
-              {autoSpinCount !== null ? (
-                <>
-                  <Pause className="w-3.5 h-3.5" />
-                  <span>Dừng ({autoSpinCount})</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Tự Động</span>
-                </>
-              )}
-            </button>
+              onStop={() => setAutoSpinCount(null)}
+            />
           </div>
 
           {/* Revolver / Aztec Rotating Spin Button */}

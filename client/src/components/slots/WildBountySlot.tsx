@@ -8,8 +8,6 @@ import {
   Sparkles,
   HelpCircle,
   X,
-  Play,
-  Pause,
   Award
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -17,6 +15,7 @@ import { useGameSocketContext } from '../../hooks/GameSocketContext';
 import { CascadeStep, FreeSpinsState, SpinResult, SlotTile } from '../../types/game';
 import { TileAnimationPhase } from './WildBountySymbols';
 import { ReelColumnView } from './ReelColumnView';
+import { AutoSpinMenu } from './AutoSpinMenu';
 
 const REEL_HEIGHTS = [3, 4, 5, 5, 4, 3];
 const MULTIPLIERS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024];
@@ -880,34 +879,16 @@ export const WildBountySlot: React.FC = () => {
               <span>Turbo</span>
             </button>
 
-            <button
+            <AutoSpinMenu
+              active={autoSpinCount !== null}
+              remaining={autoSpinCount}
               disabled={isSpinning && autoSpinCount === null}
-              onClick={() => {
-                if (autoSpinCount !== null) {
-                  setAutoSpinCount(null);
-                } else {
-                  setAutoSpinCount(25);
-                  handleSpin();
-                }
+              onSelect={count => {
+                setAutoSpinCount(count);
+                handleSpin();
               }}
-              className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
-                autoSpinCount !== null
-                  ? 'bg-rose-500/20 border-rose-500/60 text-rose-300 animate-pulse'
-                  : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              {autoSpinCount !== null ? (
-                <>
-                  <Pause className="w-3.5 h-3.5" />
-                  <span>Dừng ({autoSpinCount})</span>
-                </>
-              ) : (
-                <>
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Tự Động</span>
-                </>
-              )}
-            </button>
+              onStop={() => setAutoSpinCount(null)}
+            />
           </div>
 
           {/* Revolver Barrel Spin Button */}
